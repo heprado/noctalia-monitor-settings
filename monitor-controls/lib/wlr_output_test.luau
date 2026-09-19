@@ -64,3 +64,28 @@ local positions2 = wlr.computeLayout(outputsForLayout, cellMapMissingC, 3, 3)
 assert(positions2.C == nil, "C has no cell assignment, should not be positioned")
 
 print("wlr_output_test: computeLayout OK")
+
+-- Zero outputs -> empty map.
+local seeded0 = wlr.seedCellMap({}, 3, 3)
+local count0 = 0
+for _ in pairs(seeded0) do count0 = count0 + 1 end
+assert(count0 == 0, "expected empty cell map for 0 outputs")
+
+-- One output -> dead center of a 3x3 grid, regardless of its real x/y.
+local seeded1 = wlr.seedCellMap({ { name = "DP-2", x = 0, y = 0 } }, 3, 3)
+assert(seeded1["DP-2"].row == 1 and seeded1["DP-2"].col == 1, "single output should be centered")
+
+-- Three outputs left-to-right by real x (a typical triple-monitor desk)
+-- should rank into distinct, increasing columns, all on the same row
+-- since their y is identical.
+local seeded3 = wlr.seedCellMap({
+  { name = "left", x = 0, y = 0 },
+  { name = "center", x = 1920, y = 0 },
+  { name = "right", x = 3840, y = 0 },
+}, 3, 3)
+assert(seeded3.left.col < seeded3.center.col, "left should rank before center")
+assert(seeded3.center.col < seeded3.right.col, "center should rank before right")
+assert(seeded3.left.row == seeded3.center.row and seeded3.center.row == seeded3.right.row,
+  "all three share the same y, so must share the same row")
+
+print("wlr_output_test: seedCellMap OK")

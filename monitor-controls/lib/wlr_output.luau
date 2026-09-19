@@ -10,6 +10,11 @@
 -- stays testable with the standalone `luau` CLI, which has neither
 -- global available.
 
+-- Public surface: parseOutputs (raw wlr-randr JSON array -> normalized
+-- output list), computeLayout (outputs + cell assignment -> pixel
+-- positions), seedCellMap (outputs' real positions -> a first-guess cell
+-- assignment, used only when no saved layout.json entry exists yet).
+
 local M = {}
 
 -- rawList is one already-decoded `wlr-randr --json` array. Each element's
@@ -101,6 +106,55 @@ function M.computeLayout(outputs: {any}, cellMap: {[string]: any}, gridRows: num
     end
   end
   return positions
+end
+
+-- Only ever needed once per output, the first time it's ever seen with no
+-- saved layout.json entry for it -- a rough starting point the user can
+-- drag to correct, not an attempt at pixel-perfect reconstruction of
+-- whatever arrangement was already in effect. Ranks outputs into column
+-- bands by *distinct* real x values and into row bands by distinct real y
+-- values (not by output rank directly -- ranking outputs themselves,
+-- rather than their distinct coordinate values, splits same-y outputs
+-- across different rows on ties, confirmed live with three same-y
+-- outputs: naive per-output ranking put them in three different rows
+-- despite being perfectly level).
+function M.seedCellMap(outputs: {any}, gridRows: number, gridCols: number): {[string]: any}
+  local cellMap = {}
+  local n = #outputs
+  if n == 0 then
+    return cellMap
+  end
+  if n == 1 then
+    cellMap[outputs[1].name] = { row = math.floor(gridRows / 2), col = math.floor(gridCols / 2) }
+    return cellMap
+  end
+
+  local function rankOfDistinct(getValue, gridSize: number)
+    local distinct = {}
+    local seen = {}
+    for _, o in ipairs(outputs) do
+      local v = getValue(o)
+      if not seen[v] then
+        seen[v] = true
+        table.insert(distinct, v)
+      end
+    end
+    table.sort(distinct)
+    local rankByValue = {}
+    local m = #distinct
+    for i, v in ipairs(distinct) do
+      rankByValue[v] = math.min(gridSize - 1, math.floor((i - 1) * gridSize / m))
+    end
+    return rankByValue
+  end
+
+  local colRank = rankOfDistinct(function(o) return o.x end, gridCols)
+  local rowRank = rankOfDistinct(function(o) return o.y end, gridRows)
+
+  for _, o in ipairs(outputs) do
+    cellMap[o.name] = { row = rowRank[o.y], col = colRank[o.x] }
+  end
+  return cellMap
 end
 
 return M
