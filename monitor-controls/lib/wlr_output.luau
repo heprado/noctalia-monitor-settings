@@ -54,7 +54,25 @@ end
 -- column/row before its own. Guarantees zero overlap for any arrangement
 -- of occupied cells, using only each output's current mode and scale --
 -- no per-arrangement special-casing needed.
+--
+-- Defensive about its own inputs, because cellMap comes from layout.json
+-- on disk -- persisted state that can be stale (saved by a previous run
+-- with different grid dimensions) or hand-edited -- and `outputs` comes
+-- from a live wlr-randr read that can legitimately report an output with
+-- no current mode (width/height nil) mid-hotplug. Any entry that would
+-- make the arithmetic or the colWidth/rowHeight indexing throw is simply
+-- excluded from the result rather than taking the whole layout down.
 function M.computeLayout(outputs: {any}, cellMap: {[string]: any}, gridRows: number, gridCols: number): {[string]: any}
+  local function cellInRange(cell: any): boolean
+    return type(cell) == "table"
+      and type(cell.row) == "number"
+      and type(cell.col) == "number"
+      and cell.row >= 0
+      and cell.row <= gridRows - 1
+      and cell.col >= 0
+      and cell.col <= gridCols - 1
+  end
+
   local byName = {}
   for _, o in ipairs(outputs) do
     byName[o.name] = o
@@ -71,7 +89,7 @@ function M.computeLayout(outputs: {any}, cellMap: {[string]: any}, gridRows: num
 
   for name, cell in pairs(cellMap) do
     local o = byName[name]
-    if o then
+    if o and o.width ~= nil and o.height ~= nil and cellInRange(cell) then
       local logicalWidth = o.width / (o.scale or 1)
       local logicalHeight = o.height / (o.scale or 1)
       if logicalWidth > colWidth[cell.col] then
@@ -98,7 +116,13 @@ function M.computeLayout(outputs: {any}, cellMap: {[string]: any}, gridRows: num
 
   local positions = {}
   for name, cell in pairs(cellMap) do
-    if byName[name] then
+    local o = byName[name]
+    -- Same exclusions as the sizing loop above, so an output that
+    -- contributed no logical size (no current mode) or sits on an
+    -- out-of-grid cell never gets a position computed for it either --
+    -- moving a monitor to an offset derived from sizes it wasn't part of
+    -- is worse than leaving it where the compositor already put it.
+    if o and o.width ~= nil and o.height ~= nil and cellInRange(cell) then
       positions[name] = {
         x = math.floor(colOffset[cell.col] + 0.5),
         y = math.floor(rowOffset[cell.row] + 0.5),
