@@ -293,16 +293,16 @@ local selectedOutputName = nil
 
 local function outputTile(o)
   local selected = selectedOutputName == o.name
-  return ui.dragSource({
-    key = "output-tile-" .. o.name,
-    dragType = "output",
-    payload = o.name,
-    previewAncestor = 0,
+  -- onClick belongs on this inner column, NOT on the dragSource: the
+  -- host's drag_source has no onClick prop at all (it drops unknown
+  -- props with a `'drag_source' has no prop 'onClick', ignored` warning),
+  -- so selecting a tile -- and with it the whole "Configurações" route
+  -- into the DDC/CI screen -- silently never fired. Clicks on a control
+  -- nested inside a drag source still work normally; dragging only takes
+  -- over once the pointer passes the host's movement threshold.
+  local content = ui.column({
     align = "center",
     gap = 6,
-    padding = 14,
-    radius = 12,
-    fill = selected and "primary/0.18" or "secondary/0.10",
     onClick = function()
       selectedOutputName = o.name
       render()
@@ -320,6 +320,18 @@ local function outputTile(o)
       maxLines = 1,
     }),
   })
+
+  return ui.dragSource({
+    key = "output-tile-" .. o.name,
+    dragType = "output",
+    payload = o.name,
+    previewAncestor = 0,
+    align = "center",
+    gap = 6,
+    padding = 14,
+    radius = 12,
+    fill = selected and "primary/0.18" or "secondary/0.10",
+  }, { content })
 end
 
 local GRID_ROWS = 3
@@ -344,6 +356,17 @@ local function arrangementGrid(outputs, cellMap)
       if occupantName and byName[occupantName] then
         table.insert(cellChildren, outputTile(byName[occupantName]))
       end
+
+      -- An occupied cell takes no fill of its own (the tile inside it
+      -- supplies the color); an empty one gets a faint one so the drop
+      -- targets are visible. Written out rather than as
+      -- `occupantName and nil or "secondary/0.05"`, which is the classic
+      -- Lua ternary trap: with nil in the middle it yields the right-hand
+      -- side unconditionally, so every cell got the empty-cell fill.
+      local cellFill = nil
+      if #cellChildren == 0 then
+        cellFill = "secondary/0.05"
+      end
       table.insert(rowCells, ui.dropZone({
         key = "cell-" .. r .. "-" .. c,
         accepts = { "output" },
@@ -360,7 +383,7 @@ local function arrangementGrid(outputs, cellMap)
         width = 90,
         height = 90,
         radius = 12,
-        fill = occupantName and nil or "secondary/0.05",
+        fill = cellFill,
       }, cellChildren))
     end
     table.insert(rows, ui.row({ key = "arrangement-row-" .. r, gap = 10 }, rowCells))
@@ -450,76 +473,115 @@ render = function()
     }),
   }
 
-  if status.detecting or not status.checked then
-    -- Covers both: the real "detecting" window, and the brief instant
-    -- between onOpen's ensure_loaded and the service actually flipping
-    -- detecting true -- never shows the "no monitors" message for a
-    -- monitor set that simply hasn't been checked yet.
-    table.insert(sections, ui.label({ text = "Detecting monitors…", color = "on_surface_variant" }))
-  elseif not status.monitors or #status.monitors == 0 then
-    table.insert(sections, ui.label({
-      text = "No DDC/CI monitors found. Make sure ddcutil is installed and DDC/CI is enabled in the monitor's own OSD menu.",
-      color = "on_surface_variant",
-      maxLines = 4,
-    }))
-  else
-    -- Two screens: the arrangement grid (selectedMonitorId == nil) and
-    -- one monitor's DDC/CI controls (selectedMonitorId set, from
-    -- pressing "Configurações" with an output tile selected). If the
-    -- selected monitor disappeared (unplugged, then Refresh), fall back
-    -- to the grid rather than showing a stale/missing screen.
-    local selected = nil
-    if selectedMonitorId ~= nil then
-      for _, m in ipairs(status.monitors) do
-        if m.id == selectedMonitorId then
-          selected = m
+  -- Two screens: the home screen (arrangement grid) and one monitor's
+  -- DDC/CI controls (selectedMonitorId set, from pressing
+  -- "Configurações" with an output tile selected). If the selected
+  -- monitor disappeared (unplugged, then Refresh), fall back to the home
+  -- screen rather than showing a stale/missing screen.
+  --
+  -- The ddcutil status (detecting / none found) deliberately does NOT
+  -- gate this split. Arrangement needs only wlr-randr and DDC/CI needs
+  -- only ddcutil -- they're independent dependencies, so a machine with
+  -- no ddcutil, no i2c-dev access, or DDC/CI switched off in the OSD
+  -- still gets a fully working arrangement grid; that status is shown as
+  -- a note under the grid (it explains a disabled "Configurações"
+  -- button) instead of replacing everything.
+  local monitors = status.monitors or {}
+  local selected = nil
+  if selectedMonitorId ~= nil then
+    for _, m in ipairs(monitors) do
+      if m.id == selectedMonitorId then
+        selected = m
+        break
+      end
+    end
+    if not selected then
+      selectedMonitorId = nil
+    end
+  end
+
+  local function ddcStatusNote()
+    if status.detecting or not status.checked then
+      -- Covers both: the real "detecting" window, and the brief instant
+      -- between onOpen's ensure_loaded and the service actually flipping
+      -- detecting true -- never shows the "no monitors" message for a
+      -- monitor set that simply hasn't been checked yet.
+      return ui.label({ text = "Detecting DDC/CI monitors…", color = "on_surface_variant", fontSize = 12 })
+    elseif #monitors == 0 then
+      return ui.label({
+        text = "No DDC/CI monitors found. Make sure ddcutil is installed and DDC/CI is enabled in the monitor's own OSD menu.",
+        color = "on_surface_variant",
+        fontSize = 12,
+        maxLines = 4,
+      })
+    end
+    return nil
+  end
+
+  if selected then
+    table.insert(sections, monitorContent(selected))
+  elseif layout.supported then
+    table.insert(sections, arrangementGrid(layout.outputs, layout.cellMap))
+
+    local canConfigure = false
+    local targetMonitor = nil
+    if selectedOutputName then
+      local selectedOutput = nil
+      for _, o in ipairs(layout.outputs) do
+        if o.name == selectedOutputName then
+          selectedOutput = o
           break
         end
       end
-      if not selected then
-        selectedMonitorId = nil
-      end
-    end
-
-    if selected then
-      table.insert(sections, monitorContent(selected))
-    elseif layout.supported then
-      table.insert(sections, arrangementGrid(layout.outputs, layout.cellMap))
-      local canConfigure = false
-      local targetMonitor = nil
-      if selectedOutputName then
-        local selectedOutput = nil
-        for _, o in ipairs(layout.outputs) do
-          if o.name == selectedOutputName then
-            selectedOutput = o
+      if selectedOutput then
+        for _, m in ipairs(monitors) do
+          if m.model and m.model ~= "" and string.find(selectedOutput.description or "", m.model, 1, true) then
+            targetMonitor = m
             break
           end
         end
-        if selectedOutput then
-          for _, m in ipairs(status.monitors) do
-            if m.model and m.model ~= "" and string.find(selectedOutput.description, m.model, 1, true) then
-              targetMonitor = m
-              break
-            end
-          end
-        end
-        canConfigure = targetMonitor ~= nil
       end
+      canConfigure = targetMonitor ~= nil
+    end
+    table.insert(sections, ui.button({
+      text = "Configurações",
+      controlSize = "sm",
+      enabled = canConfigure,
+      onClick = function()
+        selectedMonitorId = targetMonitor.id
+        render()
+      end,
+    }))
+
+    local note = ddcStatusNote()
+    if note then
+      table.insert(sections, note)
+    end
+  else
+    table.insert(sections, ui.label({
+      text = "Monitor arrangement requires wlr-randr and a compositor that supports "
+        .. "wlr-output-management (Hyprland, Sway, river, ...).",
+      color = "on_surface_variant",
+      maxLines = 3,
+    }))
+
+    -- Without the grid there'd be no route into the DDC/CI screens at
+    -- all (the "Configurações" button lives on a tile), which would make
+    -- the arrangement feature's missing dependency disable an unrelated
+    -- one. A plain list of detected monitors keeps that half reachable.
+    local note = ddcStatusNote()
+    if note then
+      table.insert(sections, note)
+    end
+    for _, m in ipairs(monitors) do
       table.insert(sections, ui.button({
-        text = "Configurações",
+        key = "ddc-monitor-" .. m.id,
+        text = monitorDisplayName(m),
         controlSize = "sm",
-        enabled = canConfigure,
         onClick = function()
-          selectedMonitorId = targetMonitor.id
+          selectedMonitorId = m.id
           render()
         end,
-      }))
-    else
-      table.insert(sections, ui.label({
-        text = "Monitor arrangement requires wlr-randr and a compositor that supports "
-          .. "wlr-output-management (Hyprland, Sway, river, ...).",
-        color = "on_surface_variant",
-        maxLines = 3,
       }))
     end
   end
