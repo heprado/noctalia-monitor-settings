@@ -15,6 +15,9 @@ local COMMAND = "monitor_controls.command"
 
 local status = noctalia.state.get(STATUS) or { detecting = false, checked = false, monitors = {} }
 
+local LAYOUT = "monitor_controls.layout"
+local layout = noctalia.state.get(LAYOUT) or { supported = false, outputs = {}, cellMap = {} }
+
 -- Slider drags fire onChange continuously but should only hit ddcutil
 -- once, on release (onDragEnd) -- this tracks the latest in-flight value
 -- per "monitorId:code" between those two callbacks. The host itself
@@ -282,48 +285,85 @@ local function monitorDisplayName(m)
   return (m.model ~= nil and m.model ~= "") and m.model or ("Display " .. m.id)
 end
 
--- One tile per monitor in the grid -- click opens that monitor's own
--- screen (see selectedMonitorId / render() below). Big glyph + short
--- label; this is a launcher into a screen, not a toggle, so it has no
--- persistent "selected" look of its own.
-local function monitorIcon(m)
-  return ui.column({
-    key = "monitor-icon-" .. m.id,
+-- Which output tile is highlighted in the arrangement grid -- distinct
+-- from selectedMonitorId (which DDC/CI settings screen is open): this is
+-- "highlighted for the Configurações button", that is "which screen is
+-- currently showing".
+local selectedOutputName = nil
+
+local function outputTile(o)
+  local selected = selectedOutputName == o.name
+  return ui.dragSource({
+    key = "output-tile-" .. o.name,
+    dragType = "output",
+    payload = o.name,
+    previewAncestor = 0,
     align = "center",
     gap = 6,
     padding = 14,
     radius = 12,
-    fill = "secondary/0.10",
+    fill = selected and "primary/0.18" or "secondary/0.10",
     onClick = function()
-      selectedMonitorId = m.id
+      selectedOutputName = o.name
       render()
     end,
   }, {
-    ui.glyph({ name = "device-desktop", size = 44, color = "on_surface" }),
+    ui.glyph({
+      name = "device-desktop",
+      size = 44,
+      color = selected and "primary" or "on_surface",
+    }),
     ui.label({
-      text = monitorDisplayName(m),
+      text = o.name,
       fontSize = 12,
-      color = "on_surface_variant",
+      color = selected and "primary" or "on_surface_variant",
       maxLines = 1,
     }),
-    m.loading and ui.label({ text = "loading…", fontSize = 10, color = "on_surface_variant" }) or ui.spacer({}),
   })
 end
 
--- Chunks monitors into fixed-size rows so the grid actually wraps to
--- multiple lines instead of one ever-widening row (ui.row has no wrap
--- prop) -- 4 per row comfortably fits the panel's 560px width at this
--- tile size.
-local GRID_COLUMNS = 4
+local GRID_ROWS = 3
+local GRID_COLS = 3
 
-local function monitorGrid(monitors)
+local function arrangementGrid(outputs, cellMap)
+  local byCell = {}
+  for name, cell in pairs(cellMap) do
+    byCell[cell.row .. "," .. cell.col] = name
+  end
+  local byName = {}
+  for _, o in ipairs(outputs) do
+    byName[o.name] = o
+  end
+
   local rows = {}
-  for i = 1, #monitors, GRID_COLUMNS do
-    local rowIcons = {}
-    for j = i, math.min(i + GRID_COLUMNS - 1, #monitors) do
-      table.insert(rowIcons, monitorIcon(monitors[j]))
+  for r = 0, GRID_ROWS - 1 do
+    local rowCells = {}
+    for c = 0, GRID_COLS - 1 do
+      local occupantName = byCell[r .. "," .. c]
+      local cellChildren = {}
+      if occupantName and byName[occupantName] then
+        table.insert(cellChildren, outputTile(byName[occupantName]))
+      end
+      table.insert(rowCells, ui.dropZone({
+        key = "cell-" .. r .. "-" .. c,
+        accepts = { "output" },
+        value = r .. "," .. c,
+        onDrop = function(outputName, target)
+          local row, col = string.match(target, "^(%d+),(%d+)$")
+          noctalia.state.set(COMMAND, {
+            action = "set_cell",
+            name = outputName,
+            row = tonumber(row),
+            col = tonumber(col),
+          })
+        end,
+        width = 90,
+        height = 90,
+        radius = 12,
+        fill = occupantName and nil or "secondary/0.05",
+      }, cellChildren))
     end
-    table.insert(rows, ui.row({ key = "grid-row-" .. i, gap = 10 }, rowIcons))
+    table.insert(rows, ui.row({ key = "arrangement-row-" .. r, gap = 10 }, rowCells))
   end
   return ui.column({ gap = 10 }, rows)
 end
@@ -423,8 +463,9 @@ render = function()
       maxLines = 4,
     }))
   else
-    -- Two screens: the grid (selectedMonitorId == nil) and one monitor's
-    -- controls (selectedMonitorId set, from clicking its tile). If the
+    -- Two screens: the arrangement grid (selectedMonitorId == nil) and
+    -- one monitor's DDC/CI controls (selectedMonitorId set, from
+    -- pressing "Configurações" with an output tile selected). If the
     -- selected monitor disappeared (unplugged, then Refresh), fall back
     -- to the grid rather than showing a stale/missing screen.
     local selected = nil
@@ -442,8 +483,44 @@ render = function()
 
     if selected then
       table.insert(sections, monitorContent(selected))
+    elseif layout.supported then
+      table.insert(sections, arrangementGrid(layout.outputs, layout.cellMap))
+      local canConfigure = false
+      local targetMonitor = nil
+      if selectedOutputName then
+        local selectedOutput = nil
+        for _, o in ipairs(layout.outputs) do
+          if o.name == selectedOutputName then
+            selectedOutput = o
+            break
+          end
+        end
+        if selectedOutput then
+          for _, m in ipairs(status.monitors) do
+            if m.model and m.model ~= "" and string.find(selectedOutput.description, m.model, 1, true) then
+              targetMonitor = m
+              break
+            end
+          end
+        end
+        canConfigure = targetMonitor ~= nil
+      end
+      table.insert(sections, ui.button({
+        text = "Configurações",
+        controlSize = "sm",
+        enabled = canConfigure,
+        onClick = function()
+          selectedMonitorId = targetMonitor.id
+          render()
+        end,
+      }))
     else
-      table.insert(sections, monitorGrid(status.monitors))
+      table.insert(sections, ui.label({
+        text = "Monitor arrangement requires wlr-randr and a compositor that supports "
+          .. "wlr-output-management (Hyprland, Sway, river, ...).",
+        color = "on_surface_variant",
+        maxLines = 3,
+      }))
     end
   end
 
@@ -465,6 +542,13 @@ end
 noctalia.state.watch(STATUS, function(val)
   if type(val) == "table" then
     status = val
+    render()
+  end
+end)
+
+noctalia.state.watch(LAYOUT, function(val)
+  if type(val) == "table" then
+    layout = val
     render()
   end
 end)
