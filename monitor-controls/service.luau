@@ -33,16 +33,30 @@ local function publishLayout()
   })
 end
 
--- Forward-declared: applyCellMap (below) reapplies via refreshLayout once
+-- Forward-declared: applyCellMap (below) re-reads via refreshLayout once
 -- a `wlr-randr --pos` move completes, but refreshLayout itself is defined
 -- further down (it needs applyCellMap to exist first).
 local refreshLayout
+
+-- The exact JSON last handed to noctalia.writeFile, so an applyCellMap
+-- that changes nothing (every startup reapply, every refresh) doesn't
+-- rewrite an identical layout.json over and over.
+local lastPersistedJson = nil
 
 -- Runs one `wlr-randr --output <name> --pos <x>,<y>` per output whose
 -- computed position differs from what refreshLayout last read, then
 -- persists the cell assignment (not the pixels -- see layoutFilePath)
 -- and re-reads the live layout so the grid reflects the real outcome
 -- rather than the optimistic guess.
+--
+-- That post-move re-read is deliberately the *non-applying* variant
+-- (refreshLayout(false)). Re-applying from inside a callback this very
+-- function started is an unbounded loop whenever the move doesn't take:
+-- a failed `--pos` (or a compositor that reports back a position other
+-- than the one requested) leaves the same difference in place, so the
+-- next apply fires the same command again, forever -- spawning a
+-- wlr-randr process and a notifyError on every lap. Re-reading and
+-- republishing the real state is all this path ever needs to do.
 local function applyCellMap(cellMap)
   layoutCellMap = cellMap
   publishLayout()
@@ -66,28 +80,63 @@ local function applyCellMap(cellMap)
           if result.exitCode ~= 0 then
             noctalia.notifyError("Monitor Controls", "Failed to move " .. name)
           end
-          refreshLayout()
+          refreshLayout(false)
         end
       )
     end
   end
 
-  noctalia.writeFile(layoutFilePath(), noctalia.json.encode(cellMap))
+  local encoded = noctalia.json.encode(cellMap)
+  if encoded ~= lastPersistedJson then
+    lastPersistedJson = encoded
+    noctalia.writeFile(layoutFilePath(), encoded)
+  end
 end
 
 local layoutLoadedFromDisk = false
 
--- Re-reads the live output list. Called on service startup and whenever
--- the arrangement grid's own Refresh is pressed (wired in Task 7). On the
--- very first read, also loads any saved layout.json and reapplies it, and
--- seeds cells for any output that file doesn't mention -- this is what
--- makes the arrangement survive a restart without ever touching the
--- compositor's own config.
-refreshLayout = function()
+-- Returns the first cell of the grid that nothing in `taken` occupies,
+-- scanning row-major, or nil when every cell is already spoken for (only
+-- reachable with more outputs than GRID_ROWS * GRID_COLS cells -- such an
+-- output simply stays unassigned rather than being stacked on top of
+-- another one).
+local function firstFreeCell(taken)
+  for r = 0, GRID_ROWS - 1 do
+    for c = 0, GRID_COLS - 1 do
+      if not taken[r .. "," .. c] then
+        return { row = r, col = c }
+      end
+    end
+  end
+  return nil
+end
+
+-- Re-reads the live output list. Called on service startup, from the
+-- panel's Refresh button (so a monitor plugged in since the last read
+-- actually shows up), and -- as refreshLayout(false) -- from
+-- applyCellMap's own post-move callback.
+--
+-- `shouldApply` chooses what happens once the fresh output list is in:
+-- true re-applies the current cell map through applyCellMap (which is
+-- what makes a saved arrangement survive a restart, and what positions a
+-- newly seeded output); false only republishes the state that was just
+-- read. The post-move path must pass false -- see applyCellMap's comment
+-- on why re-applying from inside its own callback never terminates.
+--
+-- Everything else here happens on every variant alike, exactly once:
+-- the first read (whichever call gets there first) is the one that loads
+-- layout.json off disk, and any output with no cell yet is seeded on
+-- whichever read first sees it.
+refreshLayout = function(shouldApply)
   if not wlrRandrSupported then
     publishLayout()
     return
   end
+  -- Publish the support flag before the read, not after it: the panel's
+  -- own default for this state is `supported = false`, so a panel opened
+  -- in the window before the first `wlr-randr --json` resolves would
+  -- otherwise tell a perfectly capable machine that it needs wlr-randr.
+  publishLayout()
   noctalia.runAsync({ "wlr-randr", "--json" }, function(result)
     if result.exitCode ~= 0 then
       return
@@ -103,13 +152,28 @@ refreshLayout = function()
       local raw = noctalia.readFile(layoutFilePath())
       local saved = raw and noctalia.json.decode(raw)
       if type(saved) == "table" then
-        layoutCellMap = saved
+        -- Merged into the existing map, not swapped in for it: now that
+        -- LAYOUT is published before this read resolves, the panel can
+        -- show a live grid -- and the user can drag a tile, landing a
+        -- set_cell in layoutCellMap -- while this first read is still in
+        -- flight. A wholesale replacement would silently throw that
+        -- drag away.
+        for name, cell in pairs(saved) do
+          layoutCellMap[name] = cell
+        end
       end
     end
 
-    -- Seed any output layout.json doesn't mention (a monitor plugged in
-    -- for the first time, or the very first run with no saved file at
-    -- all) among whichever cells aren't already taken by a saved entry.
+    -- Seed any output with no cell yet (a monitor plugged in for the
+    -- first time, or the very first run with no saved file at all).
+    -- wlr.seedCellMap is a pure heuristic over the unassigned outputs
+    -- alone -- it has no idea which cells the saved entries already
+    -- occupy -- so its suggestions are filtered here against the cells
+    -- actually in use, both saved ones and the ones handed out earlier
+    -- in this same pass. Without that, a seeded output could land on top
+    -- of a saved one: two outputs at the identical computed position,
+    -- and only one of them still visible in the grid (the panel keys
+    -- cells by "row,col"), with no way to drag the other back out.
     local unassigned = {}
     for _, o in ipairs(layoutOutputs) do
       if layoutCellMap[o.name] == nil then
@@ -117,13 +181,39 @@ refreshLayout = function()
       end
     end
     if #unassigned > 0 then
+      local taken = {}
+      for _, cell in pairs(layoutCellMap) do
+        if cell and cell.row and cell.col then
+          taken[cell.row .. "," .. cell.col] = true
+        end
+      end
+
       local seeded = wlr.seedCellMap(unassigned, GRID_ROWS, GRID_COLS)
-      for name, cell in pairs(seeded) do
-        layoutCellMap[name] = cell
+      -- Iterated over `unassigned` rather than `seeded` so the order is
+      -- the output order wlr-randr reported, not pairs()' arbitrary one
+      -- -- which output wins a contested cell then doesn't change from
+      -- run to run.
+      for _, o in ipairs(unassigned) do
+        local cell = seeded[o.name]
+        if cell then
+          local key = cell.row .. "," .. cell.col
+          if taken[key] then
+            cell = firstFreeCell(taken)
+            key = cell and (cell.row .. "," .. cell.col) or nil
+          end
+          if cell and key then
+            taken[key] = true
+            layoutCellMap[o.name] = cell
+          end
+        end
       end
     end
 
-    applyCellMap(layoutCellMap)
+    if shouldApply then
+      applyCellMap(layoutCellMap)
+    else
+      publishLayout()
+    end
   end)
 end
 
@@ -380,6 +470,12 @@ noctalia.state.watch(COMMAND, function(cmd)
   if type(cmd) ~= "table" then return end
   if cmd.action == "refresh" then
     detectAndRefreshAll()
+    -- The two halves of this plugin have entirely separate notions of
+    -- "what's connected" -- ddcutil's display list and wlr-randr's output
+    -- list -- and one Refresh press is meant to re-read both, so a
+    -- monitor plugged in since startup appears in the arrangement grid
+    -- without reloading the whole plugin.
+    refreshLayout(true)
   elseif cmd.action == "ensure_loaded" then
     -- The panel/shortcut send this from onOpen, every time they open --
     -- checked (latched true the moment a real detect starts, not when it
@@ -396,10 +492,29 @@ noctalia.state.watch(COMMAND, function(cmd)
     for name, cell in pairs(layoutCellMap) do
       newCellMap[name] = cell
     end
+
+    -- A cell holds at most one output (the design's rule, and what the
+    -- panel's "row,col"-keyed cell lookup assumes). Dropping a tile onto
+    -- an occupied cell is therefore a *swap*, not an overwrite: the
+    -- output already there takes the dragged one's old cell. Overwriting
+    -- instead would give both the identical computed pixel position, and
+    -- the displaced tile would vanish from the grid with no way to drag
+    -- it back.
+    local previous = newCellMap[cmd.name]
+    for name, cell in pairs(newCellMap) do
+      if name ~= cmd.name and cell and cell.row == cmd.row and cell.col == cmd.col then
+        -- previous is nil only for an output that had no cell at all
+        -- (never seeded); then there's nowhere to swap the occupant to,
+        -- so it's evicted to "unassigned" rather than stacked.
+        newCellMap[name] = previous
+        break
+      end
+    end
+
     newCellMap[cmd.name] = { row = cmd.row, col = cmd.col }
     applyCellMap(newCellMap)
   end
 end)
 
 publish()
-refreshLayout()
+refreshLayout(true)
