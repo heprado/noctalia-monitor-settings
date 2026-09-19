@@ -12,3 +12,6 @@ profile.svg
 
 # Time trace
 trace.json
+
+# Subagent-driven-development scratch workspace (ledgers, briefs, reports)
+.superpowers/
