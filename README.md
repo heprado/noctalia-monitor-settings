@@ -33,6 +33,9 @@ Ported from a richer feature I originally built for [tama-shell](https://github.
   continuously -- DDC/CI queries are slow I2C round-trips).
 - All writes are fire-and-forget `ddcutil setvcp` calls with an optimistic local update; a failed write surfaces a
   notification.
+- Manufacturer-specific picture-mode names (e.g. ASUS's GameVisual presets) aren't known to `ddcutil` at all -- see
+  [`monitor-controls/devices/`](monitor-controls/devices/README.md) for the community-contributed, per-model override
+  files that fix this without touching any plugin code.
 
 ## Installing locally (development)
 

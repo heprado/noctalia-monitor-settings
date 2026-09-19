@@ -17,11 +17,18 @@ entry = "service.luau"
 id    = "widget"
 entry = "widget.luau"
 
+[[launcher_provider]]
+id                       = "launcher"
+entry                    = "launcher.luau"
+prefix                   = "monitor"
+glyph                    = "device-desktop"
+include_in_global_search = true
+
 [[panel]]
 id              = "panel"
 entry           = "panel.luau"
 width           = 560
 height          = 680
-placement       = "attached"
-position        = "auto"
-open_near_click = true
+placement       = "floating"
+position        = "center"
+open_near_click = false
