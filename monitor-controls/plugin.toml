@@ -6,7 +6,7 @@ author       = "heprado"
 license      = "MIT"
 icon         = "device-desktop"
 description  = "Full DDC/CI monitor controls (brightness, contrast, RGB gain, input source, and every other VCP feature ddcutil exposes), grouped by category, per connected monitor."
-dependencies = ["ddcutil"]
+dependencies = ["ddcutil", "wlr-randr"]
 tags         = ["hardware", "monitor", "display", "ddcutil"]
 
 [[service]]

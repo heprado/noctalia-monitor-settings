@@ -14,6 +14,10 @@ Ported from a richer feature I originally built for [tama-shell](https://github.
 - DDC/CI enabled in each monitor's own OSD menu (most monitors ship with this off by default).
 - Your user typically needs `i2c-dev` access (e.g. in the `i2c` group) for `ddcutil` to talk to the monitor without
   root.
+- `wlr-randr` installed and on `PATH` (only needed for the monitor arrangement grid — the DDC/CI
+  controls work without it). Any compositor implementing `wlr-output-management-v1` is supported
+  (Hyprland, Sway, river, ...); the arrangement screen shows an explanatory message instead of the
+  grid when it's missing or unsupported.
 
 ## What it does
 
