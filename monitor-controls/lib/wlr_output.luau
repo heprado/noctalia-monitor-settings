@@ -43,4 +43,64 @@ function M.parseOutputs(rawList: {any}): {any}
   return outputs
 end
 
+-- Same algorithm an HTML table uses for column/row sizing: colWidth[c] is
+-- the widest occupant of column c (0 for an empty column), rowHeight[r]
+-- the tallest occupant of row r; an output's offset is the sum of every
+-- column/row before its own. Guarantees zero overlap for any arrangement
+-- of occupied cells, using only each output's current mode and scale --
+-- no per-arrangement special-casing needed.
+function M.computeLayout(outputs: {any}, cellMap: {[string]: any}, gridRows: number, gridCols: number): {[string]: any}
+  local byName = {}
+  for _, o in ipairs(outputs) do
+    byName[o.name] = o
+  end
+
+  local colWidth = {}
+  local rowHeight = {}
+  for c = 0, gridCols - 1 do
+    colWidth[c] = 0
+  end
+  for r = 0, gridRows - 1 do
+    rowHeight[r] = 0
+  end
+
+  for name, cell in pairs(cellMap) do
+    local o = byName[name]
+    if o then
+      local logicalWidth = o.width / (o.scale or 1)
+      local logicalHeight = o.height / (o.scale or 1)
+      if logicalWidth > colWidth[cell.col] then
+        colWidth[cell.col] = logicalWidth
+      end
+      if logicalHeight > rowHeight[cell.row] then
+        rowHeight[cell.row] = logicalHeight
+      end
+    end
+  end
+
+  local colOffset = {}
+  local acc = 0
+  for c = 0, gridCols - 1 do
+    colOffset[c] = acc
+    acc = acc + colWidth[c]
+  end
+  local rowOffset = {}
+  acc = 0
+  for r = 0, gridRows - 1 do
+    rowOffset[r] = acc
+    acc = acc + rowHeight[r]
+  end
+
+  local positions = {}
+  for name, cell in pairs(cellMap) do
+    if byName[name] then
+      positions[name] = {
+        x = math.floor(colOffset[cell.col] + 0.5),
+        y = math.floor(rowOffset[cell.row] + 0.5),
+      }
+    end
+  end
+  return positions
+end
+
 return M
