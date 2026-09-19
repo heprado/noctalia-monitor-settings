@@ -14,6 +14,13 @@ local STATUS = "monitor_controls.status"
 local COMMAND = "monitor_controls.command"
 local LAYOUT = "monitor_controls.layout"
 
+local GRID_ROWS = 3
+local GRID_COLS = 3
+
+local function layoutFilePath()
+  return noctalia.pluginDataDir() .. "/layout.json"
+end
+
 local wlrRandrSupported = noctalia.commandExists("wlr-randr")
 local layoutOutputs = {} -- array, same shape wlr.parseOutputs returns
 local layoutCellMap = {} -- { [outputName] = { row, col } }
@@ -26,9 +33,57 @@ local function publishLayout()
   })
 end
 
+-- Forward-declared: applyCellMap (below) reapplies via refreshLayout once
+-- a `wlr-randr --pos` move completes, but refreshLayout itself is defined
+-- further down (it needs applyCellMap to exist first).
+local refreshLayout
+
+-- Runs one `wlr-randr --output <name> --pos <x>,<y>` per output whose
+-- computed position differs from what refreshLayout last read, then
+-- persists the cell assignment (not the pixels -- see layoutFilePath)
+-- and re-reads the live layout so the grid reflects the real outcome
+-- rather than the optimistic guess.
+local function applyCellMap(cellMap)
+  layoutCellMap = cellMap
+  publishLayout()
+
+  if not wlrRandrSupported then
+    return
+  end
+
+  local positions = wlr.computeLayout(layoutOutputs, cellMap, GRID_ROWS, GRID_COLS)
+  local byName = {}
+  for _, o in ipairs(layoutOutputs) do
+    byName[o.name] = o
+  end
+
+  for name, pos in pairs(positions) do
+    local current = byName[name]
+    if current and (current.x ~= pos.x or current.y ~= pos.y) then
+      noctalia.runAsync(
+        { "wlr-randr", "--output", name, "--pos", pos.x .. "," .. pos.y },
+        function(result)
+          if result.exitCode ~= 0 then
+            noctalia.notifyError("Monitor Controls", "Failed to move " .. name)
+          end
+          refreshLayout()
+        end
+      )
+    end
+  end
+
+  noctalia.writeFile(layoutFilePath(), noctalia.json.encode(cellMap))
+end
+
+local layoutLoadedFromDisk = false
+
 -- Re-reads the live output list. Called on service startup and whenever
--- the arrangement grid's own Refresh is pressed (wired in Task 7).
-local function refreshLayout()
+-- the arrangement grid's own Refresh is pressed (wired in Task 7). On the
+-- very first read, also loads any saved layout.json and reapplies it, and
+-- seeds cells for any output that file doesn't mention -- this is what
+-- makes the arrangement survive a restart without ever touching the
+-- compositor's own config.
+refreshLayout = function()
   if not wlrRandrSupported then
     publishLayout()
     return
@@ -42,6 +97,33 @@ local function refreshLayout()
       return
     end
     layoutOutputs = wlr.parseOutputs(decoded)
+
+    if not layoutLoadedFromDisk then
+      layoutLoadedFromDisk = true
+      local raw = noctalia.readFile(layoutFilePath())
+      local saved = raw and noctalia.json.decode(raw)
+      if type(saved) == "table" then
+        layoutCellMap = saved
+      end
+    end
+
+    -- Seed any output layout.json doesn't mention (a monitor plugged in
+    -- for the first time, or the very first run with no saved file at
+    -- all) among whichever cells aren't already taken by a saved entry.
+    local unassigned = {}
+    for _, o in ipairs(layoutOutputs) do
+      if layoutCellMap[o.name] == nil then
+        table.insert(unassigned, o)
+      end
+    end
+    if #unassigned > 0 then
+      local seeded = wlr.seedCellMap(unassigned, GRID_ROWS, GRID_COLS)
+      for name, cell in pairs(seeded) do
+        layoutCellMap[name] = cell
+      end
+    end
+
+    applyCellMap(layoutCellMap)
   end)
 end
 
@@ -309,6 +391,13 @@ noctalia.state.watch(COMMAND, function(cmd)
     end
   elseif cmd.action == "setvcp" then
     handleSetvcp(cmd)
+  elseif cmd.action == "set_cell" then
+    local newCellMap = {}
+    for name, cell in pairs(layoutCellMap) do
+      newCellMap[name] = cell
+    end
+    newCellMap[cmd.name] = { row = cmd.row, col = cmd.col }
+    applyCellMap(newCellMap)
   end
 end)
 
