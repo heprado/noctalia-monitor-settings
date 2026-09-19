@@ -8,9 +8,42 @@
 -- surfaces.
 
 local ddc = require("./lib/ddc.luau")
+local wlr = require("./lib/wlr_output.luau")
 
 local STATUS = "monitor_controls.status"
 local COMMAND = "monitor_controls.command"
+local LAYOUT = "monitor_controls.layout"
+
+local wlrRandrSupported = noctalia.commandExists("wlr-randr")
+local layoutOutputs = {} -- array, same shape wlr.parseOutputs returns
+local layoutCellMap = {} -- { [outputName] = { row, col } }
+
+local function publishLayout()
+  noctalia.state.set(LAYOUT, {
+    supported = wlrRandrSupported,
+    outputs = layoutOutputs,
+    cellMap = layoutCellMap,
+  })
+end
+
+-- Re-reads the live output list. Called on service startup and whenever
+-- the arrangement grid's own Refresh is pressed (wired in Task 7).
+local function refreshLayout()
+  if not wlrRandrSupported then
+    publishLayout()
+    return
+  end
+  noctalia.runAsync({ "wlr-randr", "--json" }, function(result)
+    if result.exitCode ~= 0 then
+      return
+    end
+    local decoded = noctalia.json.decode(result.stdout)
+    if type(decoded) ~= "table" then
+      return
+    end
+    layoutOutputs = wlr.parseOutputs(decoded)
+  end)
+end
 
 local detecting = false
 local monitors = {} -- ordered array of { id, model, features, loading }
@@ -191,3 +224,4 @@ end)
 publish()
 loadVcpInfo()
 detectAndRefreshAll()
+refreshLayout()
