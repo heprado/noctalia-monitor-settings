@@ -46,97 +46,177 @@ local function refreshLayout()
 end
 
 local detecting = false
+local checked = false -- true once the first detect/fetch cycle has ever run
 local monitors = {} -- ordered array of { id, model, features, loading }
 local vcpInfoData = {}
 
 local function publish()
-  noctalia.state.set(STATUS, { detecting = detecting, monitors = monitors })
+  noctalia.state.set(STATUS, { detecting = detecting, checked = checked, monitors = monitors })
+end
+
+-- Community-contributed, per-manufacturer OSD label overrides (see
+-- devices/ and its README) -- keyed by the 3-letter VESA PNP id
+-- (`ddcutil detect`'s "Mfg id:", e.g. "AUS" for ASUSTeK), not the exact
+-- model, so one file covers a manufacturer's whole lineup instead of
+-- needing an entry per model. Optional and additive: a manufacturer with
+-- no matching file just gets {}, and classifyFeature falls back to
+-- vcpinfo's generic name or a bare hex value. Cached per id since it's
+-- read from disk on every classify call otherwise; sanitized because
+-- mfgId comes from this display's own EDID, not a trusted literal.
+local deviceNamesCache = {}
+
+local function loadDeviceNames(mfgId: string?)
+  if not mfgId or mfgId == "" then return {} end
+  local safeId = mfgId:gsub("[^%w_%-]", "_")
+  local cached = deviceNamesCache[safeId]
+  if cached ~= nil then return cached end
+
+  local names = {}
+  local path = "devices/" .. safeId .. ".json"
+  if noctalia.fileExists(path) then
+    local raw = noctalia.readFile(path)
+    if raw then
+      local decoded = noctalia.json.decode(raw)
+      if type(decoded) == "table" then
+        names = decoded
+      end
+    end
+  end
+  deviceNamesCache[safeId] = names
+  return names
 end
 
 local function reclassifyAll()
   for _, m in ipairs(monitors) do
+    local deviceNames = loadDeviceNames(m.mfgId)
     local reclassified = {}
     for _, f in ipairs(m.features) do
-      table.insert(reclassified, ddc.classifyFeature(f, vcpInfoData))
+      table.insert(reclassified, ddc.classifyFeature(f, vcpInfoData, deviceNames))
     end
     m.features = reclassified
   end
 end
 
--- Generic MCCS protocol knowledge (not device-specific) -- fetched once,
--- not once per monitor.
-local function loadVcpInfo()
-  noctalia.runAsync({ "ddcutil", "vcpinfo", "--verbose" }, function(result)
-    if result.exitCode == 0 then
-      vcpInfoData = ddc.parseVcpInfo(result.stdout)
-      reclassifyAll()
-      publish()
+-- Generic MCCS protocol knowledge (not device-specific), but only for the
+-- codes a monitor's own `capabilities` actually declared -- NOT the ~150
+-- codes ddcutil knows about in total ("ddcutil vcpinfo --verbose" with no
+-- code list). That whole-database dump produces ~1250 lines, and parsing
+-- it reliably blew the plugin runtime's per-callback CPU budget (confirmed
+-- live: "script callback 'async command callback' exceeded its CPU
+-- budget").
+--
+-- Even the scoped ~30-code version has since tripped the same budget once,
+-- at cold start specifically -- every other service, plugin, and the
+-- compositor itself are all doing their own startup work in that window,
+-- and the budget is wall-clock, not CPU-time-for-this-script-alone, so the
+-- same parse that's comfortably fine once the system is idle can miss it
+-- under that contention. Splitting the request into small batches bounds
+-- what any *one* callback has to parse in one go, independent of how busy
+-- the system is when it runs -- each batch is its own runAsync call, all
+-- fired together, merging into vcpInfoData/reclassifying independently and
+-- idempotently as each comes back.
+local VCPINFO_BATCH_SIZE = 8
+
+local function fetchVcpInfoForCodes(codes)
+  for batchStart = 1, #codes, VCPINFO_BATCH_SIZE do
+    local cmd = { "ddcutil", "vcpinfo" }
+    for i = batchStart, math.min(batchStart + VCPINFO_BATCH_SIZE - 1, #codes) do
+      table.insert(cmd, codes[i])
     end
-  end)
+    table.insert(cmd, "--verbose")
+    noctalia.runAsync(cmd, function(result)
+      if result.exitCode == 0 then
+        for code, info in pairs(ddc.parseVcpInfo(result.stdout)) do
+          vcpInfoData[code] = info
+        end
+        reclassifyAll()
+        publish()
+      end
+    end)
+  end
 end
 
--- Real I2C queries against one display. capsProc (what's possible) and
--- valuesProc (what's current) run concurrently and independently, so
--- pendingValues (an upvalue shared by both closures) may still be empty
--- when the capabilities callback runs -- the values callback re-merges
--- current/max into m.features itself once it lands, whichever order they
--- finish in.
-local function fetchMonitor(m)
-  m.loading = true
-  publish()
-
-  local capsDone, valuesDone = false, false
-  local pendingValues = {}
-
-  local function finalize()
-    if capsDone and valuesDone then
-      m.loading = false
-      publish()
-    end
+-- Current/max for exactly the codes this monitor's own capabilities
+-- declared -- NOT "getvcp KNOWN", which silently drops every code
+-- ddcutil has no generic vcpinfo entry for (confirmed live: `getvcp
+-- KNOWN` omits this ASUS unit's manufacturer-specific E0-EB codes
+-- entirely, even though `getvcp E0` alone reads it back fine -- KNOWN is
+-- ddcutil's own generic-database membership test, not a capability
+-- check). That's the whole reason "Others"-category cards never showed a
+-- value: they're real, readable features, just never asked for.
+local function fetchValuesForCodes(m, codes, onDone)
+  if #codes == 0 then
+    onDone()
+    return
   end
-
-  noctalia.runAsync({ "ddcutil", "--display", m.id, "capabilities", "--terse" }, function(result)
-    if result.exitCode == 0 then
-      local parsed = ddc.parseCapabilities(result.stdout)
-      for _, f in ipairs(parsed) do
-        local v = pendingValues[f.code]
+  local cmd = { "ddcutil", "--display", m.id, "getvcp" }
+  for _, code in ipairs(codes) do
+    table.insert(cmd, code)
+  end
+  table.insert(cmd, "--terse")
+  noctalia.runAsync(cmd, function(result)
+    -- ddcutil exits 1 whenever ANY requested code is "not readable"
+    -- (every Write Only feature always is, e.g. "Restore factory
+    -- defaults") -- confirmed live: it still prints a valid "VCP <code>
+    -- ..." line to stdout for every code that *did* read, alongside a
+    -- "Feature XX (...) is not readable" line for the ones that didn't.
+    -- Gating the merge on exitCode == 0 was throwing away every good
+    -- value in the batch over one unrelated write-only code, which is
+    -- worse than the "Others" bug this function was written to fix: it
+    -- blanked every feature on the monitor, not just the unknown ones.
+    if #m.features > 0 then
+      local values = ddc.parseTerseValues(result.stdout)
+      for _, f in ipairs(m.features) do
+        local v = values[f.code]
         if v then
           f.current = v.current
           f.max = v.max
         end
       end
-      local classified = {}
-      for _, f in ipairs(parsed) do
-        table.insert(classified, ddc.classifyFeature(f, vcpInfoData))
+      local deviceNames = loadDeviceNames(m.mfgId)
+      local reclassified = {}
+      for _, f in ipairs(m.features) do
+        table.insert(reclassified, ddc.classifyFeature(f, vcpInfoData, deviceNames))
       end
-      m.features = classified
+      m.features = reclassified
+      publish()
     end
-    capsDone = true
-    finalize()
+    onDone()
   end)
+end
 
-  noctalia.runAsync({ "ddcutil", "--display", m.id, "getvcp", "KNOWN", "--terse" }, function(result)
-    if result.exitCode == 0 then
-      pendingValues = ddc.parseTerseValues(result.stdout)
-      if m.features then
-        for _, f in ipairs(m.features) do
-          local v = pendingValues[f.code]
-          if v then
-            f.current = v.current
-            f.max = v.max
-          end
-        end
-        if #m.features > 0 then
-          local classified = {}
-          for _, f in ipairs(m.features) do
-            table.insert(classified, ddc.classifyFeature(f, vcpInfoData))
-          end
-          m.features = classified
-        end
-      end
+-- capabilities (what's possible) has to resolve before getvcp/vcpinfo
+-- (what's current, and what those codes mean) can even know which codes
+-- to ask about -- a monitor's own capability list is the only source for
+-- that, so this is sequenced, not the independent-races shape the
+-- capsProc/valuesProc split used to be.
+local function fetchMonitor(m)
+  m.loading = true
+  publish()
+
+  noctalia.runAsync({ "ddcutil", "--display", m.id, "capabilities", "--terse" }, function(result)
+    if result.exitCode ~= 0 then
+      m.loading = false
+      publish()
+      return
     end
-    valuesDone = true
-    finalize()
+
+    local parsed = ddc.parseCapabilities(result.stdout)
+    local deviceNames = loadDeviceNames(m.mfgId)
+    local classified = {}
+    local codes = {}
+    for _, f in ipairs(parsed) do
+      table.insert(classified, ddc.classifyFeature(f, vcpInfoData, deviceNames))
+      table.insert(codes, f.code)
+    end
+    m.features = classified
+    publish()
+
+    fetchVcpInfoForCodes(codes)
+    fetchValuesForCodes(m, codes, function()
+      m.loading = false
+      publish()
+    end)
   end)
 end
 
@@ -146,6 +226,7 @@ end
 -- this doubles as the "Refresh" button's handler.
 local function detectAndRefreshAll()
   detecting = true
+  checked = true
   publish()
 
   noctalia.runAsync({ "ddcutil", "detect" }, function(result)
@@ -167,8 +248,9 @@ local function detectAndRefreshAll()
       local m = byId[d.id]
       if m then
         m.model = d.model
+        m.mfgId = d.mfgId
       else
-        m = { id = d.id, model = d.model, features = {}, loading = true }
+        m = { id = d.id, model = d.model, mfgId = d.mfgId, features = {}, loading = true }
       end
       table.insert(rebuilt, m)
     end
@@ -216,12 +298,19 @@ noctalia.state.watch(COMMAND, function(cmd)
   if type(cmd) ~= "table" then return end
   if cmd.action == "refresh" then
     detectAndRefreshAll()
+  elseif cmd.action == "ensure_loaded" then
+    -- The panel/shortcut send this from onOpen, every time they open --
+    -- checked (latched true the moment a real detect starts, not when it
+    -- finishes) makes this idempotent, so opening the panel again while
+    -- the first fetch is still in flight, or after it's long done, never
+    -- re-triggers a redundant scan.
+    if not checked then
+      detectAndRefreshAll()
+    end
   elseif cmd.action == "setvcp" then
     handleSetvcp(cmd)
   end
 end)
 
 publish()
-loadVcpInfo()
-detectAndRefreshAll()
 refreshLayout()

@@ -13,7 +13,7 @@ local ddc = require("./lib/ddc.luau")
 local STATUS = "monitor_controls.status"
 local COMMAND = "monitor_controls.command"
 
-local status = noctalia.state.get(STATUS) or { detecting = false, monitors = {} }
+local status = noctalia.state.get(STATUS) or { detecting = false, checked = false, monitors = {} }
 
 -- Slider drags fire onChange continuously but should only hit ddcutil
 -- once, on release (onDragEnd) -- this tracks the latest in-flight value
@@ -21,6 +21,117 @@ local status = noctalia.state.get(STATUS) or { detecting = false, monitors = {} 
 -- keeps showing the live drag position while dragging regardless of what
 -- we render, so no extra bookkeeping is needed for the visual side.
 local pendingSlider = {}
+
+-- Video gain codes -> which RGB channel they drive. A gain slider's 0
+-- means that channel contributes nothing at all, not "no color cast on
+-- top of white" -- so the honest spectrum for one is black (0%) to that
+-- channel's pure color (100%), not white to the color.
+local RGB_GAIN_CHANNEL = { ["16"] = "r", ["18"] = "g", ["1A"] = "b" }
+
+local function rgbGainSwatchColor(channel: string, level: number): string
+  if level < 0 then level = 0 end
+  if level > 1 then level = 1 end
+  local hex = string.format("%02x", math.floor(level * 255 + 0.5))
+  if channel == "r" then
+    return "#" .. hex .. "0000"
+  elseif channel == "g" then
+    return "#00" .. hex .. "00"
+  end
+  return "#0000" .. hex
+end
+
+-- No native gradient primitive exists in this UI toolkit -- a row of many
+-- flat-colored boxes was tried first, but flex-width rounding across that
+-- many items leaves visible seams. A real image has no such seams, so
+-- this renders one: a tiny 24-bit BMP (the simplest format that needs no
+-- compression library, unlike PNG's mandatory DEFLATE), black at column 0
+-- shading to the channel's pure color at the last column, then stretched
+-- to fill the bar via ui.image's fit="stretch". Every row is identical
+-- (a purely horizontal gradient), so storage order (BMP is bottom-up by
+-- convention) doesn't matter and one row-height suffices.
+local GRADIENT_WIDTH = 64
+
+local function u16le(n: number): string
+  n = n % 65536
+  return string.char(n % 256, math.floor(n / 256) % 256)
+end
+
+local function u32le(n: number): string
+  n = n % 4294967296
+  return string.char(
+    n % 256,
+    math.floor(n / 256) % 256,
+    math.floor(n / 65536) % 256,
+    math.floor(n / 16777216) % 256
+  )
+end
+
+local function generateGradientBmp(width: number, channel: string): string
+  local rowBytes = width * 3
+  local padding = (4 - (rowBytes % 4)) % 4
+  local pixelDataSize = rowBytes + padding
+  local fileSize = 54 + pixelDataSize
+
+  local fileHeader = "BM" .. u32le(fileSize) .. u16le(0) .. u16le(0) .. u32le(54)
+  local dibHeader = u32le(40) .. u32le(width) .. u32le(1) .. u16le(1) .. u16le(24)
+    .. u32le(0) .. u32le(pixelDataSize) .. u32le(0) .. u32le(0) .. u32le(0) .. u32le(0)
+
+  local row = {}
+  for x = 0, width - 1 do
+    local level = (width > 1) and (x / (width - 1)) or 0
+    local v = math.floor(level * 255 + 0.5)
+    local r, g, b = 0, 0, 0
+    if channel == "r" then r = v
+    elseif channel == "g" then g = v
+    else b = v end
+    table.insert(row, string.char(b, g, r)) -- BMP pixel order is BGR
+  end
+  if padding > 0 then
+    table.insert(row, string.rep("\0", padding))
+  end
+
+  return fileHeader .. dibHeader .. table.concat(row)
+end
+
+-- Generated once per channel into the plugin's persistent data dir (never
+-- noctalia.pluginDir() -- that's a runtime copy the host can rewrite from
+-- under a git-installed plugin) and reused after that; the file never
+-- needs regenerating since its content is a pure function of the channel.
+local gradientPathCache = {}
+
+local function rgbGainGradientImagePath(channel: string): string
+  local cached = gradientPathCache[channel]
+  if cached then return cached end
+
+  local path = noctalia.pluginDataDir() .. "/gradient_" .. channel .. ".bmp"
+  if not noctalia.fileExists(path) then
+    noctalia.writeFile(path, generateGradientBmp(GRADIENT_WIDTH, channel))
+  end
+  gradientPathCache[channel] = path
+  return path
+end
+
+local function rgbGainGradientBar(channel: string)
+  return ui.image({
+    path = rgbGainGradientImagePath(channel),
+    flexGrow = 1,
+    height = 8,
+    fit = "stretch",
+  })
+end
+
+-- Which monitor's settings are showing below the icon row -- one at a
+-- time, tab-switcher style, picked by clicking its icon. nil until the
+-- first render actually has a monitor list to default from.
+local selectedMonitorId = nil
+
+-- Forward-declared: the icon row's click handler needs to trigger a
+-- re-render, but render() (below) is what builds the icon row in the
+-- first place. `local function render()` further down would create a
+-- second, later local that the icon-row closure -- defined above it in
+-- the file -- can never see; this earlier declaration is the one both ends
+-- close over.
+local render
 
 local function sendSetvcp(monitorId, code, valueStr, optimisticCurrent)
   noctalia.state.set(COMMAND, {
@@ -43,10 +154,22 @@ local function featureControl(monitorId, f, muteFeature)
     })
   elseif f.widget == "slider" then
     local key = monitorId .. ":" .. f.code
+    local maxVal = (f.max and f.max > 0) and f.max or 100
+    local current = f.current or 0
+
+    local function commitTyped(text)
+      local v = tonumber(text)
+      if v == nil then return end
+      local rounded = math.floor(v + 0.5)
+      if rounded < 0 then rounded = 0 end
+      if rounded > maxVal then rounded = maxVal end
+      sendSetvcp(monitorId, f.code, tostring(rounded), rounded)
+    end
+
     local sliderNode = ui.slider({
       min = 0,
-      max = (f.max and f.max > 0) and f.max or 100,
-      value = f.current or 0,
+      max = maxVal,
+      value = current,
       flexGrow = 1,
       onChange = function(v)
         pendingSlider[key] = tonumber(v)
@@ -61,6 +184,27 @@ local function featureControl(monitorId, f, muteFeature)
       end,
     })
 
+    -- ui.input is uncontrolled (host owns the text once seeded), so the
+    -- key is re-derived from the published value: an external change
+    -- (write confirmed, refresh) forces a fresh field seeded with the new
+    -- number, while typing itself never changes `current` and so never
+    -- gets clobbered mid-edit.
+    local valueInput = ui.input({
+      key = key .. ":value:" .. tostring(current),
+      value = tostring(current),
+      controlSize = "sm",
+      width = 48,
+      submitOnEnter = true,
+      onSubmit = commitTyped,
+    })
+
+    local channel = RGB_GAIN_CHANNEL[f.code]
+    local sliderRow = ui.row({ gap = 8, align = "center", flexGrow = 1 }, { sliderNode, valueInput })
+
+    if channel then
+      sliderRow = ui.column({ gap = 6 }, { sliderRow, rgbGainGradientBar(channel) })
+    end
+
     -- Code 62 (Audio speaker volume): composite with 8D (Audio
     -- mute/Screen blank) as a mute button next to the slider, mirroring
     -- the tama-shell original -- 8D itself never gets its own card (see
@@ -68,7 +212,7 @@ local function featureControl(monitorId, f, muteFeature)
     if f.code == "62" and muteFeature then
       local muted = muteFeature.current == 1
       return ui.row({ gap = 8, align = "center", flexGrow = 1 }, {
-        sliderNode,
+        sliderRow,
         ui.button({
           glyph = muted and "volume-off" or "volume",
           controlSize = "sm",
@@ -80,7 +224,7 @@ local function featureControl(monitorId, f, muteFeature)
         }),
       })
     end
-    return sliderNode
+    return sliderRow
   elseif f.widget == "combobox" then
     local options = {}
     local selectedIndex = nil
@@ -134,19 +278,91 @@ local function featureCard(monitorId, f, muteFeature)
   }, children)
 end
 
-local function monitorSection(m)
-  local groups = ddc.groupFeaturesByCategory(m.features or {})
+local function monitorDisplayName(m)
+  return (m.model ~= nil and m.model ~= "") and m.model or ("Display " .. m.id)
+end
+
+-- One tile per monitor in the grid -- click opens that monitor's own
+-- screen (see selectedMonitorId / render() below). Big glyph + short
+-- label; this is a launcher into a screen, not a toggle, so it has no
+-- persistent "selected" look of its own.
+local function monitorIcon(m)
+  return ui.column({
+    key = "monitor-icon-" .. m.id,
+    align = "center",
+    gap = 6,
+    padding = 14,
+    radius = 12,
+    fill = "secondary/0.10",
+    onClick = function()
+      selectedMonitorId = m.id
+      render()
+    end,
+  }, {
+    ui.glyph({ name = "device-desktop", size = 44, color = "on_surface" }),
+    ui.label({
+      text = monitorDisplayName(m),
+      fontSize = 12,
+      color = "on_surface_variant",
+      maxLines = 1,
+    }),
+    m.loading and ui.label({ text = "loading…", fontSize = 10, color = "on_surface_variant" }) or ui.spacer({}),
+  })
+end
+
+-- Chunks monitors into fixed-size rows so the grid actually wraps to
+-- multiple lines instead of one ever-widening row (ui.row has no wrap
+-- prop) -- 4 per row comfortably fits the panel's 560px width at this
+-- tile size.
+local GRID_COLUMNS = 4
+
+local function monitorGrid(monitors)
+  local rows = {}
+  for i = 1, #monitors, GRID_COLUMNS do
+    local rowIcons = {}
+    for j = i, math.min(i + GRID_COLUMNS - 1, #monitors) do
+      table.insert(rowIcons, monitorIcon(monitors[j]))
+    end
+    table.insert(rows, ui.row({ key = "grid-row-" .. i, gap = 10 }, rowIcons))
+  end
+  return ui.column({ gap = 10 }, rows)
+end
+
+-- The selected monitor's own screen: a back button into the grid, then
+-- everything monitorSection used to render below its old header.
+local function monitorContent(m)
   local muteFeature = ddc.findFeature(m.features or {}, "8D")
+
+  -- "Others" is the true fallback bucket -- codes with no vcpinfo entry
+  -- at all (manufacturer-reserved, e.g. this ASUS's E0-EB) and nothing in
+  -- devices/<model>.json either. They're real, readable values (see
+  -- ddc.luau), just not meaningful without knowing what they mean, so
+  -- they're noise in the common case: drop the whole category from what
+  -- renders, without touching what gets parsed/classified.
+  local groups = {}
+  for _, g in ipairs(ddc.groupFeaturesByCategory(m.features or {})) do
+    if g.category ~= "Others" then
+      table.insert(groups, g)
+    end
+  end
 
   local children = {
     ui.row({ align = "center", gap = 8 }, {
+      ui.button({
+        glyph = "arrow-left",
+        controlSize = "sm",
+        variant = "ghost",
+        onClick = function()
+          selectedMonitorId = nil
+          render()
+        end,
+      }),
       ui.label({
-        text = (m.model ~= nil and m.model ~= "") and m.model or ("Display " .. m.id),
+        text = monitorDisplayName(m),
         fontSize = 14,
         fontWeight = "bold",
         color = "on_surface",
       }),
-      m.loading and ui.label({ text = "loading…", fontSize = 11, color = "on_surface_variant" }) or ui.spacer({}),
     }),
   }
 
@@ -162,10 +378,10 @@ local function monitorSection(m)
     end
   end
 
-  return ui.column({ key = "monitor-" .. m.id, gap = 8 }, children)
+  return ui.column({ key = "monitor-content-" .. m.id, gap = 8 }, children)
 end
 
-local function render()
+render = function()
   local sections = {
     ui.row({ align = "center", justify = "space_between", gap = 8 }, {
       ui.row({ align = "center", gap = 6 }, {
@@ -194,7 +410,11 @@ local function render()
     }),
   }
 
-  if status.detecting then
+  if status.detecting or not status.checked then
+    -- Covers both: the real "detecting" window, and the brief instant
+    -- between onOpen's ensure_loaded and the service actually flipping
+    -- detecting true -- never shows the "no monitors" message for a
+    -- monitor set that simply hasn't been checked yet.
     table.insert(sections, ui.label({ text = "Detecting monitors…", color = "on_surface_variant" }))
   elseif not status.monitors or #status.monitors == 0 then
     table.insert(sections, ui.label({
@@ -203,8 +423,27 @@ local function render()
       maxLines = 4,
     }))
   else
-    for _, m in ipairs(status.monitors) do
-      table.insert(sections, monitorSection(m))
+    -- Two screens: the grid (selectedMonitorId == nil) and one monitor's
+    -- controls (selectedMonitorId set, from clicking its tile). If the
+    -- selected monitor disappeared (unplugged, then Refresh), fall back
+    -- to the grid rather than showing a stale/missing screen.
+    local selected = nil
+    if selectedMonitorId ~= nil then
+      for _, m in ipairs(status.monitors) do
+        if m.id == selectedMonitorId then
+          selected = m
+          break
+        end
+      end
+      if not selected then
+        selectedMonitorId = nil
+      end
+    end
+
+    if selected then
+      table.insert(sections, monitorContent(selected))
+    else
+      table.insert(sections, monitorGrid(status.monitors))
     end
   end
 
@@ -213,6 +452,13 @@ end
 
 function onOpen(_context)
   status = noctalia.state.get(STATUS) or status
+  -- The service does no ddcutil work at all until something actually
+  -- needs it -- this is that trigger. checked latches true the instant a
+  -- real detect starts, so re-opening the panel mid-fetch (or long after
+  -- it finished) never re-triggers a redundant scan.
+  if not status.checked then
+    noctalia.state.set(COMMAND, { action = "ensure_loaded" })
+  end
   render()
 end
 
