@@ -311,13 +311,23 @@ local function featureLabel(code, rawName)
   return key and noctalia.tr(key) or rawName
 end
 
+-- Same standard-MCCS-code set as FEATURE_TR_KEY (reused instead of a
+-- second 150-entry table -- a code translated has a description
+-- translated too, by construction of how the translation files are
+-- built), just under the "feature_desc" namespace instead of "feature".
+local function featureDescLabel(code, rawDesc)
+  local lc = string.lower(code)
+  if not FEATURE_TR_KEY[lc] then return rawDesc end
+  return noctalia.tr("feature_desc." .. lc) or rawDesc
+end
+
 local function featureCard(monitorId, f, muteFeature)
   local children = {
     ui.label({ text = featureLabel(f.code, f.name), fontSize = 13, fontWeight = "semibold", color = "on_surface" }),
   }
   if f.description ~= "" then
     table.insert(children, ui.label({
-      text = f.description,
+      text = featureDescLabel(f.code, f.description),
       fontSize = 11,
       color = "on_surface_variant",
       maxLines = 2,
