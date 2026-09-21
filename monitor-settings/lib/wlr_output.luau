@@ -1,5 +1,5 @@
 --!strict
--- Monitor Controls -- wlroots output parsing and grid-layout math.
+-- Monitor Settings -- wlroots output parsing and grid-layout math.
 --
 -- Pure parsing/layout for `wlr-randr --json`, the generic wlroots
 -- equivalent of xrandr -- works on any compositor implementing

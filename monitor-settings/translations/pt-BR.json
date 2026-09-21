@@ -1,6 +1,6 @@
 {
   "panel": {
-    "title": "Controles de Monitor",
+    "title": "Configurações de Monitor",
     "refresh": "Atualizar",
     "detecting": "Detectando monitores DDC/CI…",
     "no_monitors": "Nenhum monitor DDC/CI encontrado. Verifique se o ddcutil está instalado e se o DDC/CI está habilitado no menu OSD do monitor.",

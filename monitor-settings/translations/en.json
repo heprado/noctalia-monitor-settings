@@ -1,6 +1,6 @@
 {
   "panel": {
-    "title": "Monitor Controls",
+    "title": "Monitor Settings",
     "refresh": "Refresh",
     "detecting": "Detecting DDC/CI monitors…",
     "no_monitors": "No DDC/CI monitors found. Make sure ddcutil is installed and DDC/CI is enabled in the monitor's own OSD menu.",

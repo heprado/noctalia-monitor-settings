@@ -1,6 +1,6 @@
 {
   "panel": {
-    "title": "显示器控制",
+    "title": "显示器设置",
     "refresh": "刷新",
     "detecting": "正在检测 DDC/CI 显示器…",
     "no_monitors": "未找到 DDC/CI 显示器。请确认已安装 ddcutil，并在显示器自身的 OSD 菜单中启用了 DDC/CI。",

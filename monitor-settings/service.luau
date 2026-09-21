@@ -1,5 +1,5 @@
 --!nonstrict
--- Monitor Controls -- [[service]] entry.
+-- Monitor Settings -- [[service]] entry.
 --
 -- Owns every ddcutil invocation and publishes classified per-monitor VCP
 -- feature data to shared plugin state. widget.luau and panel.luau are

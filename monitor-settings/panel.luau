@@ -1,5 +1,5 @@
 --!nonstrict
--- Monitor Controls -- [[panel]] entry.
+-- Monitor Settings -- [[panel]] entry.
 --
 -- Renders whatever service.luau has published: every connected monitor,
 -- its VCP features grouped by category (Image/Audio/Preset/Control/

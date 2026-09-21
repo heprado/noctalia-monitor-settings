@@ -1,6 +1,6 @@
 {
   "panel": {
-    "title": "モニターコントロール",
+    "title": "モニター設定",
     "refresh": "更新",
     "detecting": "DDC/CI モニターを検出中…",
     "no_monitors": "DDC/CI モニターが見つかりません。ddcutil がインストールされていること、モニター本体の OSD メニューで DDC/CI が有効になっていることを確認してください。",

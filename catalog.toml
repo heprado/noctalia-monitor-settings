@@ -1,6 +1,6 @@
 [[plugin]]
 id           = "heprado/monitor-settings"
-name         = "Monitor Controls (DDC/CI)"
+name         = "Monitor Settings (DDC/CI)"
 version      = "1.0.0"
 author       = "heprado"
 license      = "MIT"

@@ -1,5 +1,5 @@
 --!nonstrict
--- Monitor Controls -- [[launcher_provider]] entry.
+-- Monitor Settings -- [[launcher_provider]] entry.
 --
 -- Answers behind the "/monitor" prefix and also the plain global search
 -- (include_in_global_search = true in plugin.toml) -- typing "monitor" (or

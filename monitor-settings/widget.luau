@@ -1,5 +1,5 @@
 --!nonstrict
--- Monitor Controls -- [[widget]] entry (bar icon).
+-- Monitor Settings -- [[widget]] entry (bar icon).
 --
 -- Purely a status readout + panel launcher: service.luau owns every
 -- ddcutil call, this just mirrors its published state into a glyph and a

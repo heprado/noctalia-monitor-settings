@@ -69,7 +69,7 @@ subdirectory), so it can be added as a plugin source directly:
 noctalia msg plugins source add heprado-monitor-settings git https://github.com/heprado/noctalia-monitor-settings
 ```
 
-Then enable **Monitor Controls (DDC/CI)** from the plugin store.
+Then enable **Monitor Settings (DDC/CI)** from the plugin store.
 
 ## Status
 
