@@ -1,0 +1,40 @@
+{
+  "panel": {
+    "title": "Управление монитором",
+    "refresh": "Обновить",
+    "detecting": "Поиск мониторов DDC/CI…",
+    "no_monitors": "Мониторы DDC/CI не найдены. Убедитесь, что ddcutil установлен и DDC/CI включён в экранном меню монитора.",
+    "arrangement_unsupported": "Для расположения мониторов требуется wlr-randr и композитор с поддержкой wlr-output-management (Hyprland, Sway, river и др.).",
+    "settings_unavailable": "Настройки DDC/CI недоступны для этого монитора.",
+    "trigger": "Выполнить",
+    "display_fallback": "Дисплей {id}"
+  },
+  "widget": {
+    "detecting": "Поиск мониторов…",
+    "click_to_check": "Нажмите, чтобы проверить мониторы DDC/CI",
+    "none_detected": "Мониторы DDC/CI не обнаружены",
+    "monitors_found": {
+      "one": "{count} монитор с поддержкой DDC/CI",
+      "other": "{count} мониторов с поддержкой DDC/CI"
+    }
+  },
+  "launcher": {
+    "title": "Настройки монитора",
+    "subtitle": "Расположение и настройки монитора"
+  },
+  "category": {
+    "image": "Изображение",
+    "audio": "Звук",
+    "preset": "Профиль",
+    "control": "Управление",
+    "miscellaneous": "Разное",
+    "others": "Прочее"
+  },
+  "errors": {
+    "move_failed": "Не удалось переместить {name}",
+    "setvcp_failed": "Не удалось установить {code} на дисплее {id}"
+  },
+  "readonly": {
+    "no_data": "Нет данных"
+  }
+}

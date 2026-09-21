@@ -1,0 +1,40 @@
+{
+  "panel": {
+    "title": "Monitorsteuerung",
+    "refresh": "Aktualisieren",
+    "detecting": "DDC/CI-Monitore werden erkannt…",
+    "no_monitors": "Keine DDC/CI-Monitore gefunden. Stelle sicher, dass ddcutil installiert und DDC/CI im OSD-Menü des Monitors aktiviert ist.",
+    "arrangement_unsupported": "Die Monitoranordnung erfordert wlr-randr und einen Compositor mit Unterstützung für wlr-output-management (Hyprland, Sway, river, ...).",
+    "settings_unavailable": "Die DDC/CI-Einstellungen sind für diesen Monitor nicht verfügbar.",
+    "trigger": "Auslösen",
+    "display_fallback": "Bildschirm {id}"
+  },
+  "widget": {
+    "detecting": "Monitore werden erkannt…",
+    "click_to_check": "Klicken, um nach DDC/CI-Monitoren zu suchen",
+    "none_detected": "Keine DDC/CI-Monitore erkannt",
+    "monitors_found": {
+      "one": "{count} Monitor mit DDC/CI-Steuerung",
+      "other": "{count} Monitore mit DDC/CI-Steuerung"
+    }
+  },
+  "launcher": {
+    "title": "Monitoreinstellungen",
+    "subtitle": "Anordnung und Monitoreinstellungen"
+  },
+  "category": {
+    "image": "Bild",
+    "audio": "Audio",
+    "preset": "Voreinstellung",
+    "control": "Steuerung",
+    "miscellaneous": "Sonstiges",
+    "others": "Andere"
+  },
+  "errors": {
+    "move_failed": "Verschieben von {name} fehlgeschlagen",
+    "setvcp_failed": "{code} konnte auf Bildschirm {id} nicht gesetzt werden"
+  },
+  "readonly": {
+    "no_data": "Keine Daten"
+  }
+}

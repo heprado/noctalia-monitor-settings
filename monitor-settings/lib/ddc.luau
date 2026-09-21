@@ -350,7 +350,11 @@ local FREQUENCY_DISPLAY = {
   AE = function(v: number) return string.format("%.2f Hz", v / 100) end,
 }
 
-function M.readOnlyDisplay(f): string
+-- Returns nil (not a hardcoded "No data") for the one case with nothing
+-- to show: this module stays a pure, host-agnostic parser with no
+-- noctalia.tr call of its own (see the file header), so the caller
+-- supplies the localized fallback text instead.
+function M.readOnlyDisplay(f): string?
   local freqFormat = FREQUENCY_DISPLAY[f.code]
   if freqFormat and f.current ~= nil then
     return freqFormat(f.current)
@@ -365,7 +369,7 @@ function M.readOnlyDisplay(f): string
   if f.current ~= nil then
     return tostring(f.current)
   end
-  return "No data"
+  return nil
 end
 
 function M.findFeature(features, code: string)

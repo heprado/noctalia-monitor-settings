@@ -78,7 +78,7 @@ local function applyCellMap(cellMap)
         { "wlr-randr", "--output", name, "--pos", pos.x .. "," .. pos.y },
         function(result)
           if result.exitCode ~= 0 then
-            noctalia.notifyError("Monitor Controls", "Failed to move " .. name)
+            noctalia.notifyError(noctalia.tr("panel.title"), noctalia.tr("errors.move_failed", { name = name }))
           end
           refreshLayout(false)
         end
@@ -461,7 +461,10 @@ local function handleSetvcp(cmd)
 
   noctalia.runAsync({ "ddcutil", "--display", cmd.id, "setvcp", cmd.code, cmd.value }, function(result)
     if result.exitCode ~= 0 then
-      noctalia.notifyError("Monitor Controls", "Failed to set " .. cmd.code .. " on display " .. cmd.id)
+      noctalia.notifyError(
+        noctalia.tr("panel.title"),
+        noctalia.tr("errors.setvcp_failed", { code = cmd.code, id = cmd.id })
+      )
     end
   end)
 end

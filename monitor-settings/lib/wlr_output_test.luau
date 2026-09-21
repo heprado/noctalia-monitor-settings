@@ -1,6 +1,6 @@
 -- Tests for lib/wlr_output.luau's three pure functions.
 --
--- Run: nix run nixpkgs#luau -- monitor-controls/lib/wlr_output_test.luau
+-- Run: nix run nixpkgs#luau -- monitor-settings/lib/wlr_output_test.luau
 --
 -- wlr_output.luau touches no noctalia.*/ui.* global on purpose, which is
 -- exactly what lets the standalone luau CLI (which has none of them) run

@@ -1,0 +1,40 @@
+{
+  "panel": {
+    "title": "モニターコントロール",
+    "refresh": "更新",
+    "detecting": "DDC/CI モニターを検出中…",
+    "no_monitors": "DDC/CI モニターが見つかりません。ddcutil がインストールされていること、モニター本体の OSD メニューで DDC/CI が有効になっていることを確認してください。",
+    "arrangement_unsupported": "モニター配置機能には wlr-randr と、wlr-output-management に対応したコンポジター（Hyprland、Sway、river など）が必要です。",
+    "settings_unavailable": "このモニターでは DDC/CI 設定を利用できません。",
+    "trigger": "実行",
+    "display_fallback": "ディスプレイ {id}"
+  },
+  "widget": {
+    "detecting": "モニターを検出中…",
+    "click_to_check": "クリックして DDC/CI モニターを確認",
+    "none_detected": "DDC/CI モニターが検出されませんでした",
+    "monitors_found": {
+      "one": "DDC/CI 対応モニター {count} 台",
+      "other": "DDC/CI 対応モニター {count} 台"
+    }
+  },
+  "launcher": {
+    "title": "モニター設定",
+    "subtitle": "配置とモニター設定"
+  },
+  "category": {
+    "image": "画像",
+    "audio": "オーディオ",
+    "preset": "プリセット",
+    "control": "コントロール",
+    "miscellaneous": "その他の設定",
+    "others": "その他"
+  },
+  "errors": {
+    "move_failed": "{name} の移動に失敗しました",
+    "setvcp_failed": "ディスプレイ {id} で {code} を設定できませんでした"
+  },
+  "readonly": {
+    "no_data": "データなし"
+  }
+}

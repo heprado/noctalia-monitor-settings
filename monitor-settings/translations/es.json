@@ -1,0 +1,40 @@
+{
+  "panel": {
+    "title": "Controles de Monitor",
+    "refresh": "Actualizar",
+    "detecting": "Detectando monitores DDC/CI…",
+    "no_monitors": "No se encontraron monitores DDC/CI. Asegúrate de que ddcutil esté instalado y de que el DDC/CI esté habilitado en el menú OSD del monitor.",
+    "arrangement_unsupported": "La disposición de monitores requiere wlr-randr y un compositor compatible con wlr-output-management (Hyprland, Sway, river, ...).",
+    "settings_unavailable": "La configuración DDC/CI no está disponible para este monitor.",
+    "trigger": "Activar",
+    "display_fallback": "Pantalla {id}"
+  },
+  "widget": {
+    "detecting": "Detectando monitores…",
+    "click_to_check": "Haz clic para buscar monitores DDC/CI",
+    "none_detected": "No se detectaron monitores DDC/CI",
+    "monitors_found": {
+      "one": "{count} monitor con control DDC/CI",
+      "other": "{count} monitores con control DDC/CI"
+    }
+  },
+  "launcher": {
+    "title": "Configuración de Monitor",
+    "subtitle": "Disposición y configuración de monitores"
+  },
+  "category": {
+    "image": "Imagen",
+    "audio": "Audio",
+    "preset": "Preajuste",
+    "control": "Control",
+    "miscellaneous": "Varios",
+    "others": "Otros"
+  },
+  "errors": {
+    "move_failed": "No se pudo mover {name}",
+    "setvcp_failed": "No se pudo establecer {code} en la pantalla {id}"
+  },
+  "readonly": {
+    "no_data": "Sin datos"
+  }
+}

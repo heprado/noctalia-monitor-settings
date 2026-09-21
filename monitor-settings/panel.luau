@@ -123,9 +123,9 @@ local function rgbGainGradientBar(channel: string)
   })
 end
 
--- Which monitor's settings are showing below the icon row -- one at a
--- time, tab-switcher style, picked by clicking its icon. nil until the
--- first render actually has a monitor list to default from.
+-- Selected monitor in the no-wlr-randr fallback list below (render()'s
+-- else branch). Unrelated to selectedOutputName, which does the same job
+-- for the arrangement-grid tiles.
 local selectedMonitorId = nil
 
 -- Forward-declared: the icon row's click handler needs to trigger a
@@ -149,7 +149,7 @@ end
 local function featureControl(monitorId, f, muteFeature)
   if f.widget == "button" then
     return ui.button({
-      text = "Trigger",
+      text = noctalia.tr("panel.trigger"),
       controlSize = "sm",
       onClick = function()
         sendSetvcp(monitorId, f.code, "1", nil)
@@ -252,7 +252,7 @@ local function featureControl(monitorId, f, muteFeature)
   end
 
   return ui.label({
-    text = ddc.readOnlyDisplay(f),
+    text = ddc.readOnlyDisplay(f) or noctalia.tr("readonly.no_data"),
     color = "on_surface_variant",
     fontSize = 13,
   })
@@ -282,56 +282,104 @@ local function featureCard(monitorId, f, muteFeature)
 end
 
 local function monitorDisplayName(m)
-  return (m.model ~= nil and m.model ~= "") and m.model or ("Display " .. m.id)
+  return (m.model ~= nil and m.model ~= "") and m.model or noctalia.tr("panel.display_fallback", { id = m.id })
 end
 
--- Which output tile is highlighted in the arrangement grid -- distinct
--- from selectedMonitorId (which DDC/CI settings screen is open): this is
--- "highlighted for the Configurações button", that is "which screen is
--- currently showing".
+-- ddcutil's own "MCCS specification groups:" line is always plain English
+-- ("Image", "Audio", ...) -- ddc.luau passes that raw text through as-is
+-- (it stays a pure, host-agnostic parser, so it never calls noctalia.tr
+-- itself), so the translation lookup happens here at render time instead.
+-- Any category text not in this table (an MCCS group this plugin hasn't
+-- seen) is shown as ddcutil printed it, untranslated.
+local CATEGORY_TR_KEY = {
+  Image = "category.image",
+  Audio = "category.audio",
+  Preset = "category.preset",
+  Control = "category.control",
+  Miscellaneous = "category.miscellaneous",
+  Others = "category.others",
+}
+
+local function categoryLabel(category)
+  local key = CATEGORY_TR_KEY[category]
+  return key and noctalia.tr(key) or category
+end
+
+-- Which output tile is selected in the arrangement grid -- distinct from
+-- selectedMonitorId (used only by the no-wlr-randr fallback list below):
+-- selecting a tile is what makes its DDC/CI settings appear under the grid.
 local selectedOutputName = nil
+
+-- Matches the ui.dropZone width/height in arrangementGrid below -- an
+-- occupied cell's own fill comes from the tile inside it (see cellFill in
+-- arrangementGrid), so the tile has to actually fill the cell itself, not
+-- just sit centered and smaller inside it.
+local GRID_CELL_SIZE = 90
 
 local function outputTile(o)
   local selected = selectedOutputName == o.name
-  -- onClick belongs on this inner column, NOT on the dragSource: the
-  -- host's drag_source has no onClick prop at all (it drops unknown
-  -- props with a `'drag_source' has no prop 'onClick', ignored` warning),
-  -- so selecting a tile -- and with it the whole "Configurações" route
-  -- into the DDC/CI screen -- silently never fired. Clicks on a control
-  -- nested inside a drag source still work normally; dragging only takes
-  -- over once the pointer passes the host's movement threshold.
-  local content = ui.column({
-    align = "center",
-    gap = 6,
-    onClick = function()
-      selectedOutputName = o.name
-      render()
-    end,
-  }, {
-    ui.glyph({
-      name = "device-desktop",
-      size = 44,
-      color = selected and "primary" or "on_surface",
-    }),
-    ui.label({
-      text = o.name,
-      fontSize = 12,
-      color = selected and "primary" or "on_surface_variant",
-      maxLines = 1,
-    }),
-  })
-
-  return ui.dragSource({
+  -- ui.dragSource swallows every click in its area to arm a possible drag
+  -- (drag_source.cpp) and never forwards to a nested onClick, even on a
+  -- plain tap -- there's no press-duration signal either, so a single
+  -- area can't be "hold to drag, tap to open settings". Hence the split:
+  -- the whole icon+name is the dragSource, and a separate gear button
+  -- (outside it) opens this monitor's settings.
+  return ui.column({
     key = "output-tile-" .. o.name,
-    dragType = "output",
-    payload = o.name,
-    previewAncestor = 0,
-    align = "center",
-    gap = 6,
-    padding = 14,
+    width = GRID_CELL_SIZE,
+    height = GRID_CELL_SIZE,
+    gap = 2,
+    padding = 6,
     radius = 12,
     fill = selected and "primary/0.18" or "secondary/0.10",
-  }, { content })
+  }, {
+    -- ui.button always bakes in Style::spaceSm padding around its content
+    -- (Button's constructor, unconditionally -- there's no "padding" prop
+    -- to override it for buttons), which read as an oversized pink box
+    -- around a 14px glyph. A plain row has no padding unless given one, so
+    -- it sizes to exactly the glyph.
+    ui.row({ justify = "end" }, {
+      ui.row({
+        onClick = function()
+          selectedOutputName = o.name
+          render()
+        end,
+      }, {
+        ui.glyph({ name = "settings", size = 14, color = "on_surface_variant" }),
+      }),
+    }),
+    ui.dragSource({
+      key = "output-drag-" .. o.name,
+      dragType = "output",
+      payload = o.name,
+      previewAncestor = 1,
+      flexGrow = 1,
+      align = "center",
+      justify = "center",
+    }, {
+      -- drag_source is hardcoded Horizontal internally (createControl in
+      -- the host's ui_tree_reconciler.cpp) regardless of any prop -- this
+      -- inner column is what actually stacks the icon above the name.
+      ui.column({ align = "center", gap = 3 }, {
+        ui.glyph({
+          name = "device-desktop",
+          size = 30,
+          color = selected and "primary" or "on_surface",
+        }),
+        ui.label({
+          text = o.name,
+          fontSize = 11,
+          color = selected and "primary" or "on_surface_variant",
+          maxLines = 1,
+        }),
+      }),
+    }),
+    -- Mirrors the gear row's own height (a 14px glyph) so this flexGrow
+    -- area's center lines up with the whole tile's center, not just the
+    -- center of the leftover space below the gear row -- without this the
+    -- icon reads as sitting low, since only the top has a reserved strip.
+    ui.spacer({ height = 14 }),
+  })
 end
 
 local GRID_ROWS = 3
@@ -380,20 +428,25 @@ local function arrangementGrid(outputs, cellMap)
             col = tonumber(col),
           })
         end,
-        width = 90,
-        height = 90,
+        width = GRID_CELL_SIZE,
+        height = GRID_CELL_SIZE,
         radius = 12,
         fill = cellFill,
       }, cellChildren))
     end
     table.insert(rows, ui.row({ key = "arrangement-row-" .. r, gap = 10 }, rowCells))
   end
-  return ui.column({ gap = 10 }, rows)
+  -- align = "center": ui.scroll (the panel's root container) stretches
+  -- every top-level section to the panel's full width by default: without
+  -- this, each row -- narrower than the panel -- sits pinned to the left
+  -- edge of that stretched width instead of centered.
+  return ui.column({ gap = 10, align = "center" }, rows)
 end
 
--- The selected monitor's own screen: a back button into the grid, then
--- everything monitorSection used to render below its old header.
-local function monitorContent(m)
+-- A monitor's DDC/CI controls. onBack collapses this back out -- clears
+-- selectedOutputName or selectedMonitorId, depending on which caller
+-- rendered it.
+local function monitorContent(m, onBack)
   local muteFeature = ddc.findFeature(m.features or {}, "8D")
 
   -- "Others" is the true fallback bucket -- codes with no vcpinfo entry
@@ -415,10 +468,7 @@ local function monitorContent(m)
         glyph = "arrow-left",
         controlSize = "sm",
         variant = "ghost",
-        onClick = function()
-          selectedMonitorId = nil
-          render()
-        end,
+        onClick = onBack,
       }),
       ui.label({
         text = monitorDisplayName(m),
@@ -431,7 +481,7 @@ local function monitorContent(m)
 
   for _, g in ipairs(groups) do
     table.insert(children, ui.label({
-      text = string.upper(g.category),
+      text = string.upper(categoryLabel(g.category)),
       fontSize = 11,
       fontWeight = "bold",
       color = "on_surface_variant",
@@ -449,14 +499,14 @@ render = function()
     ui.row({ align = "center", justify = "space_between", gap = 8 }, {
       ui.row({ align = "center", gap = 6 }, {
         ui.glyph({ name = "device-desktop", color = "primary", size = 18 }),
-        ui.label({ text = "Monitor Controls", fontSize = 15, fontWeight = "bold", color = "on_surface" }),
+        ui.label({ text = noctalia.tr("panel.title"), fontSize = 15, fontWeight = "bold", color = "on_surface" }),
       }),
       ui.row({ gap = 6 }, {
         ui.button({
           glyph = "refresh",
           controlSize = "sm",
           variant = "ghost",
-          tooltip = "Refresh",
+          tooltip = noctalia.tr("panel.refresh"),
           onClick = function()
             noctalia.state.set(COMMAND, { action = "refresh" })
           end,
@@ -473,32 +523,12 @@ render = function()
     }),
   }
 
-  -- Two screens: the home screen (arrangement grid) and one monitor's
-  -- DDC/CI controls (selectedMonitorId set, from pressing
-  -- "Configurações" with an output tile selected). If the selected
-  -- monitor disappeared (unplugged, then Refresh), fall back to the home
-  -- screen rather than showing a stale/missing screen.
-  --
-  -- The ddcutil status (detecting / none found) deliberately does NOT
-  -- gate this split. Arrangement needs only wlr-randr and DDC/CI needs
-  -- only ddcutil -- they're independent dependencies, so a machine with
-  -- no ddcutil, no i2c-dev access, or DDC/CI switched off in the OSD
-  -- still gets a fully working arrangement grid; that status is shown as
-  -- a note under the grid (it explains a disabled "Configurações"
-  -- button) instead of replacing everything.
+  -- The grid (or, without wlr-randr, a plain monitor list) always stays
+  -- on screen; clicking a monitor appends its DDC/CI settings below it
+  -- rather than replacing the grid. ddcutil status (detecting/not found)
+  -- doesn't gate the grid at all -- wlr-randr and ddcutil are independent
+  -- dependencies, so a machine missing one still gets the other working.
   local monitors = status.monitors or {}
-  local selected = nil
-  if selectedMonitorId ~= nil then
-    for _, m in ipairs(monitors) do
-      if m.id == selectedMonitorId then
-        selected = m
-        break
-      end
-    end
-    if not selected then
-      selectedMonitorId = nil
-    end
-  end
 
   local function ddcStatusNote()
     if status.detecting or not status.checked then
@@ -506,10 +536,10 @@ render = function()
       -- between onOpen's ensure_loaded and the service actually flipping
       -- detecting true -- never shows the "no monitors" message for a
       -- monitor set that simply hasn't been checked yet.
-      return ui.label({ text = "Detecting DDC/CI monitors…", color = "on_surface_variant", fontSize = 12 })
+      return ui.label({ text = noctalia.tr("panel.detecting"), color = "on_surface_variant", fontSize = 12 })
     elseif #monitors == 0 then
       return ui.label({
-        text = "No DDC/CI monitors found. Make sure ddcutil is installed and DDC/CI is enabled in the monitor's own OSD menu.",
+        text = noctalia.tr("panel.no_monitors"),
         color = "on_surface_variant",
         fontSize = 12,
         maxLines = 4,
@@ -518,12 +548,20 @@ render = function()
     return nil
   end
 
-  if selected then
-    table.insert(sections, monitorContent(selected))
-  elseif layout.supported then
+  if layout.supported then
     table.insert(sections, arrangementGrid(layout.outputs, layout.cellMap))
 
-    local canConfigure = false
+    local note = ddcStatusNote()
+    if note then
+      table.insert(sections, note)
+    end
+
+    -- Match the selected tile's output back to its ddcutil monitor entry
+    -- by model name appearing in wlr-randr's output description (e.g.
+    -- "ASUSTek COMPUTER INC VG278 ..." contains ddcutil's Model "VG278").
+    -- If the selected output disappeared (unplugged, then Refresh), this
+    -- naturally comes back nil and the settings section just doesn't
+    -- render -- no separate screen to fall back out of.
     local targetMonitor = nil
     if selectedOutputName then
       local selectedOutput = nil
@@ -541,48 +579,68 @@ render = function()
           end
         end
       end
-      canConfigure = targetMonitor ~= nil
     end
-    table.insert(sections, ui.button({
-      text = "Configurações",
-      controlSize = "sm",
-      enabled = canConfigure,
-      onClick = function()
-        selectedMonitorId = targetMonitor.id
-        render()
-      end,
-    }))
 
-    local note = ddcStatusNote()
-    if note then
-      table.insert(sections, note)
+    if targetMonitor then
+      table.insert(sections, monitorContent(targetMonitor, function()
+        selectedOutputName = nil
+        render()
+      end))
+    elseif selectedOutputName then
+      table.insert(sections, ui.label({
+        text = noctalia.tr("panel.settings_unavailable"),
+        color = "on_surface_variant",
+        fontSize = 12,
+      }))
     end
   else
     table.insert(sections, ui.label({
-      text = "Monitor arrangement requires wlr-randr and a compositor that supports "
-        .. "wlr-output-management (Hyprland, Sway, river, ...).",
+      text = noctalia.tr("panel.arrangement_unsupported"),
       color = "on_surface_variant",
       maxLines = 3,
     }))
 
-    -- Without the grid there'd be no route into the DDC/CI screens at
-    -- all (the "Configurações" button lives on a tile), which would make
-    -- the arrangement feature's missing dependency disable an unrelated
-    -- one. A plain list of detected monitors keeps that half reachable.
     local note = ddcStatusNote()
     if note then
       table.insert(sections, note)
     end
+
+    -- Without the grid there'd be no route into the DDC/CI screens at
+    -- all (a tile click is normally what selects a monitor), which would
+    -- make the arrangement feature's missing dependency disable an
+    -- unrelated one. A plain list of detected monitors keeps that half
+    -- reachable, each expanding its own settings below the list on click.
+    local selected = nil
+    if selectedMonitorId ~= nil then
+      for _, m in ipairs(monitors) do
+        if m.id == selectedMonitorId then
+          selected = m
+          break
+        end
+      end
+      if not selected then
+        selectedMonitorId = nil
+      end
+    end
+
     for _, m in ipairs(monitors) do
       table.insert(sections, ui.button({
         key = "ddc-monitor-" .. m.id,
         text = monitorDisplayName(m),
         controlSize = "sm",
+        selected = m.id == selectedMonitorId,
         onClick = function()
-          selectedMonitorId = m.id
+          selectedMonitorId = (selectedMonitorId == m.id) and nil or m.id
           render()
         end,
       }))
+    end
+
+    if selected then
+      table.insert(sections, monitorContent(selected, function()
+        selectedMonitorId = nil
+        render()
+      end))
     end
   end
 

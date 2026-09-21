@@ -21,17 +21,17 @@ local function render()
   local children = { ui.glyph({ name = "device-desktop", size = 14 }) }
 
   if status.detecting then
-    barWidget.setTooltip("Detecting monitors…")
+    barWidget.setTooltip(noctalia.tr("widget.detecting"))
   elseif not status.checked then
     -- The service does no ddcutil work until the panel is opened once
     -- (see service.luau's ensure_loaded) -- an unchecked "none found"
     -- would be a flat-out guess, so say nothing's been checked instead.
-    barWidget.setTooltip("Click to check for DDC/CI monitors")
+    barWidget.setTooltip(noctalia.tr("widget.click_to_check"))
   elseif status.monitors and #status.monitors > 0 then
     table.insert(children, ui.label({ text = tostring(#status.monitors), fontWeight = "bold" }))
-    barWidget.setTooltip(string.format("%d monitor(s) with DDC/CI control", #status.monitors))
+    barWidget.setTooltip(noctalia.trp("widget.monitors_found", #status.monitors))
   else
-    barWidget.setTooltip("No DDC/CI monitors detected")
+    barWidget.setTooltip(noctalia.tr("widget.none_detected"))
   end
 
   barWidget.render(container({ gap = 4, align = "center" }, children))
@@ -45,7 +45,7 @@ noctalia.state.watch(STATUS, function(val)
 end)
 
 function onClick()
-  noctalia.togglePanel("heprado/monitor-controls:panel")
+  noctalia.togglePanel("heprado/monitor-settings:panel")
 end
 
 render()

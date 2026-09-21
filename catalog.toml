@@ -1,5 +1,5 @@
 [[plugin]]
-id           = "heprado/monitor-controls"
+id           = "heprado/monitor-settings"
 name         = "Monitor Controls (DDC/CI)"
 version      = "1.0.0"
 author       = "heprado"

@@ -10,9 +10,12 @@
 local RESULT_ID = "open-panel"
 
 function onQuery(text)
+  local title = noctalia.tr("launcher.title")
   local score = 100
   if text ~= "" then
-    score = noctalia.fuzzyScore(text, "Monitor Controls")
+    -- Matched against the translated title, not a hardcoded English
+    -- string, so searching in the user's own language finds this result.
+    score = noctalia.fuzzyScore(text, title)
     if score == nil then
       launcher.setResults(text, {})
       return
@@ -22,8 +25,8 @@ function onQuery(text)
   launcher.setResults(text, {
     {
       id = RESULT_ID,
-      title = "Monitor Controls",
-      subtitle = "DDC/CI monitor settings",
+      title = title,
+      subtitle = noctalia.tr("launcher.subtitle"),
       glyph = "device-desktop",
       score = score,
     },
@@ -32,6 +35,6 @@ end
 
 function onActivate(id)
   if id == RESULT_ID then
-    noctalia.togglePanel("heprado/monitor-controls:panel")
+    noctalia.togglePanel("heprado/monitor-settings:panel")
   end
 end

@@ -1,4 +1,4 @@
-# noctalia-monitor-controls
+# noctalia-monitor-settings
 
 A [Noctalia](https://github.com/noctalia-dev/noctalia) plugin exposing full DDC/CI monitor control through
 [`ddcutil`](https://www.ddcutil.com/) -- not just brightness (which Noctalia already supports natively), but every
@@ -14,10 +14,10 @@ Ported from a richer feature I originally built for [tama-shell](https://github.
 - DDC/CI enabled in each monitor's own OSD menu (most monitors ship with this off by default).
 - Your user typically needs `i2c-dev` access (e.g. in the `i2c` group) for `ddcutil` to talk to the monitor without
   root.
-- `wlr-randr` installed and on `PATH` (only needed for the monitor arrangement grid — the DDC/CI
-  controls work without it). Any compositor implementing `wlr-output-management-v1` is supported
-  (Hyprland, Sway, river, ...); the arrangement screen shows an explanatory message instead of the
-  grid when it's missing or unsupported.
+- `wlr-randr` installed and on `PATH`, for the monitor arrangement grid. Any compositor implementing
+  `wlr-output-management-v1` is supported (Hyprland, Sway, river, ...). If it's missing or the
+  compositor doesn't support it, the arrangement screen shows an explanatory message instead of the
+  grid, but the rest of the plugin (DDC/CI controls) still works.
 
 ## What it does
 
@@ -44,17 +44,17 @@ Ported from a richer feature I originally built for [tama-shell](https://github.
 - All writes are fire-and-forget `ddcutil setvcp` calls with an optimistic local update; a failed write surfaces a
   notification.
 - Manufacturer-specific picture-mode names (e.g. ASUS's GameVisual presets) aren't known to `ddcutil` at all -- see
-  [`monitor-controls/devices/`](monitor-controls/devices/README.md) for the community-contributed, per-model override
+  [`monitor-settings/devices/`](monitor-settings/devices/README.md) for the community-contributed, per-model override
   files that fix this without touching any plugin code.
 
 ## Installing locally (development)
 
-Drop the `monitor-controls/` directory into Noctalia's plugin data dir, matching the id after the slash:
+Drop the `monitor-settings/` directory into Noctalia's plugin data dir, matching the id after the slash:
 
 ```sh
-git clone https://github.com/heprado/noctalia-monitor-controls.git
+git clone https://github.com/heprado/noctalia-monitor-settings.git
 mkdir -p "$XDG_DATA_HOME/noctalia/plugins"
-ln -s "$(pwd)/noctalia-monitor-controls/monitor-controls" "$XDG_DATA_HOME/noctalia/plugins/monitor-controls"
+ln -s "$(pwd)/noctalia-monitor-settings/monitor-settings" "$XDG_DATA_HOME/noctalia/plugins/monitor-settings"
 ```
 
 Then enable it once from Noctalia's plugin settings. `.luau` edits hot-reload automatically; `plugin.toml` changes
@@ -66,7 +66,7 @@ This repo is laid out like `official-plugins`/`community-plugins` (a `catalog.to
 subdirectory), so it can be added as a plugin source directly:
 
 ```sh
-noctalia msg plugins source add heprado-monitor-controls git https://github.com/heprado/noctalia-monitor-controls
+noctalia msg plugins source add heprado-monitor-settings git https://github.com/heprado/noctalia-monitor-settings
 ```
 
 Then enable **Monitor Controls (DDC/CI)** from the plugin store.

@@ -1,0 +1,40 @@
+{
+  "panel": {
+    "title": "显示器控制",
+    "refresh": "刷新",
+    "detecting": "正在检测 DDC/CI 显示器…",
+    "no_monitors": "未找到 DDC/CI 显示器。请确认已安装 ddcutil，并在显示器自身的 OSD 菜单中启用了 DDC/CI。",
+    "arrangement_unsupported": "显示器排列功能需要 wlr-randr 以及支持 wlr-output-management 的合成器（Hyprland、Sway、river 等）。",
+    "settings_unavailable": "此显示器没有可用的 DDC/CI 设置。",
+    "trigger": "触发",
+    "display_fallback": "显示器 {id}"
+  },
+  "widget": {
+    "detecting": "正在检测显示器…",
+    "click_to_check": "点击以检测 DDC/CI 显示器",
+    "none_detected": "未检测到 DDC/CI 显示器",
+    "monitors_found": {
+      "one": "{count} 台支持 DDC/CI 的显示器",
+      "other": "{count} 台支持 DDC/CI 的显示器"
+    }
+  },
+  "launcher": {
+    "title": "显示器设置",
+    "subtitle": "布局与显示器设置"
+  },
+  "category": {
+    "image": "图像",
+    "audio": "音频",
+    "preset": "预设",
+    "control": "控制",
+    "miscellaneous": "其他设置",
+    "others": "其他"
+  },
+  "errors": {
+    "move_failed": "移动 {name} 失败",
+    "setvcp_failed": "无法在显示器 {id} 上设置 {code}"
+  },
+  "readonly": {
+    "no_data": "无数据"
+  }
+}
