@@ -258,9 +258,62 @@ local function featureControl(monitorId, f, muteFeature)
   })
 end
 
+-- Same situation as CATEGORY_TR_KEY below: ddc.luau's classifyFeature
+-- passes vcpinfo's raw English feature name straight through (f.name) so
+-- it stays a pure parser. This maps the standard MCCS VCP codes (per
+-- ddcutil's own vcpinfo table) to a translated label; a code not in this
+-- table -- typically an E0-FF manufacturer-extension code with no generic
+-- MCCS name at all, or a rarer one not yet translated here -- falls back
+-- to ddcutil's raw name, same as devices/ overrides do for value names.
+local FEATURE_TR_KEY = {
+  ["01"] = "feature.01", ["02"] = "feature.02", ["03"] = "feature.03", ["04"] = "feature.04",
+  ["05"] = "feature.05", ["06"] = "feature.06", ["08"] = "feature.08", ["0a"] = "feature.0a",
+  ["0b"] = "feature.0b", ["0c"] = "feature.0c", ["0e"] = "feature.0e", ["10"] = "feature.10",
+  ["11"] = "feature.11", ["12"] = "feature.12", ["13"] = "feature.13", ["14"] = "feature.14",
+  ["16"] = "feature.16", ["17"] = "feature.17", ["18"] = "feature.18", ["1a"] = "feature.1a",
+  ["1c"] = "feature.1c", ["1e"] = "feature.1e", ["1f"] = "feature.1f", ["20"] = "feature.20",
+  ["22"] = "feature.22", ["24"] = "feature.24", ["26"] = "feature.26", ["28"] = "feature.28",
+  ["29"] = "feature.29", ["2a"] = "feature.2a", ["2c"] = "feature.2c", ["2e"] = "feature.2e",
+  ["30"] = "feature.30", ["32"] = "feature.32", ["34"] = "feature.34", ["36"] = "feature.36",
+  ["38"] = "feature.38", ["39"] = "feature.39", ["3a"] = "feature.3a", ["3c"] = "feature.3c",
+  ["3e"] = "feature.3e", ["40"] = "feature.40", ["41"] = "feature.41", ["42"] = "feature.42",
+  ["43"] = "feature.43", ["44"] = "feature.44", ["46"] = "feature.46", ["48"] = "feature.48",
+  ["4a"] = "feature.4a", ["4c"] = "feature.4c", ["52"] = "feature.52", ["54"] = "feature.54",
+  ["56"] = "feature.56", ["58"] = "feature.58", ["59"] = "feature.59", ["5a"] = "feature.5a",
+  ["5b"] = "feature.5b", ["5c"] = "feature.5c", ["5d"] = "feature.5d", ["5e"] = "feature.5e",
+  ["60"] = "feature.60", ["62"] = "feature.62", ["63"] = "feature.63", ["64"] = "feature.64",
+  ["66"] = "feature.66", ["6b"] = "feature.6b", ["6c"] = "feature.6c", ["6d"] = "feature.6d",
+  ["6e"] = "feature.6e", ["6f"] = "feature.6f", ["70"] = "feature.70", ["71"] = "feature.71",
+  ["72"] = "feature.72", ["73"] = "feature.73", ["74"] = "feature.74", ["75"] = "feature.75",
+  ["76"] = "feature.76", ["78"] = "feature.78", ["7a"] = "feature.7a", ["7c"] = "feature.7c",
+  ["7e"] = "feature.7e", ["80"] = "feature.80", ["82"] = "feature.82", ["84"] = "feature.84",
+  ["86"] = "feature.86", ["87"] = "feature.87", ["88"] = "feature.88", ["8a"] = "feature.8a",
+  ["8b"] = "feature.8b", ["8c"] = "feature.8c", ["8d"] = "feature.8d", ["8e"] = "feature.8e",
+  ["8f"] = "feature.8f", ["90"] = "feature.90", ["91"] = "feature.91", ["92"] = "feature.92",
+  ["93"] = "feature.93", ["94"] = "feature.94", ["95"] = "feature.95", ["96"] = "feature.96",
+  ["97"] = "feature.97", ["98"] = "feature.98", ["99"] = "feature.99", ["9a"] = "feature.9a",
+  ["9b"] = "feature.9b", ["9c"] = "feature.9c", ["9d"] = "feature.9d", ["9e"] = "feature.9e",
+  ["9f"] = "feature.9f", ["a0"] = "feature.a0", ["a2"] = "feature.a2", ["a4"] = "feature.a4",
+  ["a5"] = "feature.a5", ["aa"] = "feature.aa", ["ac"] = "feature.ac", ["ae"] = "feature.ae",
+  ["b0"] = "feature.b0", ["b2"] = "feature.b2", ["b4"] = "feature.b4", ["b6"] = "feature.b6",
+  ["b7"] = "feature.b7", ["b8"] = "feature.b8", ["b9"] = "feature.b9", ["ba"] = "feature.ba",
+  ["bb"] = "feature.bb", ["bc"] = "feature.bc", ["bd"] = "feature.bd", ["be"] = "feature.be",
+  ["c0"] = "feature.c0", ["c2"] = "feature.c2", ["c3"] = "feature.c3", ["c4"] = "feature.c4",
+  ["c6"] = "feature.c6", ["c8"] = "feature.c8", ["c9"] = "feature.c9", ["ca"] = "feature.ca",
+  ["cc"] = "feature.cc", ["cd"] = "feature.cd", ["ce"] = "feature.ce", ["cf"] = "feature.cf",
+  ["d0"] = "feature.d0", ["d2"] = "feature.d2", ["d4"] = "feature.d4", ["d6"] = "feature.d6",
+  ["d7"] = "feature.d7", ["da"] = "feature.da", ["db"] = "feature.db", ["dc"] = "feature.dc",
+  ["de"] = "feature.de", ["df"] = "feature.df",
+}
+
+local function featureLabel(code, rawName)
+  local key = FEATURE_TR_KEY[string.lower(code)]
+  return key and noctalia.tr(key) or rawName
+end
+
 local function featureCard(monitorId, f, muteFeature)
   local children = {
-    ui.label({ text = f.name, fontSize = 13, fontWeight = "semibold", color = "on_surface" }),
+    ui.label({ text = featureLabel(f.code, f.name), fontSize = 13, fontWeight = "semibold", color = "on_surface" }),
   }
   if f.description ~= "" then
     table.insert(children, ui.label({
