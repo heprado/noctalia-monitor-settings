@@ -455,6 +455,13 @@ function sameNumber(a, b, eps) {
 // compositor -- moving three monitors at once never passes through an
 // intermediate overlapping arrangement it could reject.
 //
+// Once anything changes, every output that stays on gets its position in
+// the call, changed or not. Hyprland lays out any output the request
+// doesn't position by its own monitor rule, so with the common
+// `position = "auto"` rule, moving one monitor shoves an untouched
+// neighbour aside (eDP-1 moved below HDMI-A-1 sends HDMI-A-1 from 0,0 to
+// the right of it) -- which is exactly the state right after login.
+//
 // `risky` reports whether anything beyond position/adaptive sync changed
 // (mode, scale, rotation, on/off): the changes that can leave a screen
 // unreadable, which DisplayService asks the user to confirm.
@@ -462,6 +469,7 @@ function buildApplyArgs(outputs, configs, program) {
     var args = [program || "wlr-randr"]
     var any = false
     var risky = false
+    var perOutput = []
 
     // Never turn every output off: no screen would be left to undo it on.
     var anyEnabled = false
@@ -474,8 +482,11 @@ function buildApplyArgs(outputs, configs, program) {
     for (var k = 0; k < outputs.length; k++) {
         var o = outputs[k]
         var cfg = configs[o.name]
-        if (!cfg) continue
         var out = []
+        if (!cfg) {
+            perOutput.push({ output: o, cfg: null, out: out })
+            continue
+        }
         if (!cfg.enabled) {
             if (o.enabled) {
                 out.push("--off")
@@ -507,13 +518,24 @@ function buildApplyArgs(outputs, configs, program) {
             if (cfg.adaptiveSync != null && o.adaptiveSync != null && cfg.adaptiveSync !== o.adaptiveSync)
                 out.push("--adaptive-sync", cfg.adaptiveSync ? "enabled" : "disabled")
         }
-        if (out.length > 0) {
-            any = true
-            args.push("--output", o.name)
-            for (var a = 0; a < out.length; a++) args.push(out[a])
+        if (out.length > 0) any = true
+        perOutput.push({ output: o, cfg: cfg, out: out })
+    }
+    if (!any) return { args: null, risky: false }
+
+    for (var p = 0; p < perOutput.length; p++) {
+        var entry = perOutput[p]
+        var staysOn = entry.cfg ? entry.cfg.enabled : entry.output.enabled
+        if (staysOn && entry.out.indexOf("--pos") < 0) {
+            var at = entry.cfg || entry.output
+            entry.out.push("--pos", Math.floor(at.x) + "," + Math.floor(at.y))
+        }
+        if (entry.out.length > 0) {
+            args.push("--output", entry.output.name)
+            for (var a = 0; a < entry.out.length; a++) args.push(entry.out[a])
         }
     }
-    return any ? { args: args, risky: risky } : { args: null, risky: false }
+    return { args: args, risky: risky }
 }
 
 // A saved config, minus anything the live output can no longer honour (a

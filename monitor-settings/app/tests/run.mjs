@@ -133,7 +133,8 @@ test("buildApplyArgs: position-only change isn't risky", () => {
   const configs = D.configsFromOutputs(outputs)
   configs["eDP-1"].x = 1200
   const r = D.buildApplyArgs(outputs, configs)
-  assert.equal(r.args.join(" "), "wlr-randr --output eDP-1 --pos 1200,840")
+  // DP-1 is untouched but still pinned, or an "auto" monitor rule moves it.
+  assert.equal(r.args.join(" "), "wlr-randr --output eDP-1 --pos 1200,840 --output DP-1 --pos 0,0")
   assert.equal(r.risky, false)
 })
 
@@ -146,9 +147,25 @@ test("buildApplyArgs: mode + adaptive sync + turning an output on, atomically", 
   configs["HDMI-A-1"].x = 3000
   const r = D.buildApplyArgs(outputs, configs)
   assert.equal(r.args.join(" "),
-    "wlr-randr --output eDP-1 --mode 1920x1080@60Hz --adaptive-sync enabled"
+    "wlr-randr --output eDP-1 --mode 1920x1080@60Hz --adaptive-sync enabled --pos 1080,840"
+    + " --output DP-1 --pos 0,0"
     + " --output HDMI-A-1 --on --mode 3840x2160@60Hz --transform normal --scale 1 --pos 3000,0")
   assert.equal(r.risky, true)
+})
+
+test("buildApplyArgs pins every output that stays on, even one with no config", () => {
+  // The login case: Hyprland just laid every output out by its "auto" rule,
+  // and only eDP-1 differs from what was saved. DP-1 has nothing saved.
+  const configs = { "eDP-1": { ...D.configsFromOutputs(outputs)["eDP-1"], y: 0 } }
+  assert.equal(D.buildApplyArgs(outputs, configs).args.join(" "),
+    "wlr-randr --output eDP-1 --pos 1080,0 --output DP-1 --pos 0,0")
+})
+
+test("buildApplyArgs doesn't pin an output being turned off", () => {
+  const configs = D.configsFromOutputs(outputs)
+  configs["DP-1"].enabled = false
+  assert.equal(D.buildApplyArgs(outputs, configs).args.join(" "),
+    "wlr-randr --output eDP-1 --pos 1080,840 --output DP-1 --off")
 })
 
 test("buildApplyArgs refuses to turn every output off", () => {
