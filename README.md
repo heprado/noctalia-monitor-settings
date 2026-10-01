@@ -1,51 +1,86 @@
 # noctalia-monitor-settings
 
-A [Noctalia](https://github.com/noctalia-dev/noctalia) plugin exposing full DDC/CI monitor control through
-[`ddcutil`](https://www.ddcutil.com/) -- not just brightness (which Noctalia already supports natively), but every
-VCP feature the monitor reports: contrast, RGB gain, input source, audio volume/mute, and anything else, grouped by
-category, per connected monitor.
+A [Noctalia](https://github.com/noctalia-dev/noctalia) plugin that opens **Monitor Settings**, a
+[Quickshell](https://quickshell.org/) app for everything about your monitors:
 
-Ported from a richer feature I originally built for [tama-shell](https://github.com/heprado/tama-shell)
-(`shell/configuration/Monitor/MonitorSection.qml`), rewritten for Noctalia's Luau plugin runtime.
+- **Display arrangement** in the style of `nwg-displays`: a canvas with every output drawn to scale, dragged freely
+  with the mouse, snapping flush against its neighbours.
+- **Per-output display settings** through `wlr-randr`: on/off, resolution, refresh rate, rotation, scale, DPI and
+  adaptive sync (FreeSync / G-Sync).
+- **Full DDC/CI control** through [`ddcutil`](https://www.ddcutil.com/): not just brightness (which Noctalia already
+  supports natively) but every VCP feature the monitor reports, including contrast, RGB gain, input source and audio
+  volume/mute, grouped by category.
+
+The app follows the **active Qt theme**: whatever `QT_QPA_PLATFORMTHEME` provides (hyprqt6engine, qt6ct, KDE, ...)
+supplies its palette and fonts. With Noctalia's `qt` template on, it wears the Noctalia colors.
+
+## Layout
+
+```
+monitor-settings/
+  plugin.toml, widget.luau, launcher.luau, service.luau   Noctalia side: open the app, reapply at login
+  lib/app.luau                                             how those entries launch/toggle the app
+  app/                                                     the Quickshell app (qs -p monitor-settings/app)
+    shell.qml                                              entry: window, IPC, headless "reapply" mode
+    services/                                              Exec, I18n, DisplayService, DdcService, Draft
+    components/                                            canvas, display settings, DDC/CI cards, apply bar
+    lib/Displays.js, lib/Ddc.js                            pure parsing/layout logic
+    tests/run.mjs                                          node tests for the two libs
+  translations/                                            shared by the Noctalia entries and the app
+  devices/                                                 per-manufacturer DDC/CI label overrides
+```
+
+The Noctalia plugin only launches the app:
+
+- The **bar widget** and the **launcher result** ("monitor") toggle the window: an open window closes, otherwise
+  one is started (`quickshell -p <plugin>/app -n`).
+- The **service** runs the app once at startup in its headless `reapply` mode, which reapplies the saved display
+  configuration and exits.
 
 ## Requirements
 
-- `ddcutil` installed and on `PATH`.
-- DDC/CI enabled in each monitor's own OSD menu (most monitors ship with this off by default).
-- Your user typically needs `i2c-dev` access (e.g. in the `i2c` group) for `ddcutil` to talk to the monitor without
-  root.
-- `wlr-randr` installed and on `PATH`, for the monitor arrangement grid. Any compositor implementing
-  `wlr-output-management-v1` is supported (Hyprland, Sway, river, ...). If it's missing or the
-  compositor doesn't support it, the arrangement screen shows an explanatory message instead of the
-  grid, but the rest of the plugin (DDC/CI controls) still works.
+- `quickshell` on `PATH` (0.3 or newer).
+- `wlr-randr` on `PATH`, and a compositor implementing `wlr-output-management-v1` (Hyprland, Sway, river, ...).
+  Adaptive sync needs version 4 of that protocol; on older compositors the switch is disabled.
+- `ddcutil` on `PATH` for the DDC/CI tab. DDC/CI also has to be enabled in each monitor's own OSD menu, and your user
+  needs `i2c-dev` access (e.g. the `i2c` group).
 
-## What it does
+Missing `ddcutil` only disables the DDC/CI tab; missing `wlr-randr` only disables the arrangement and display
+settings.
 
-- A bar widget shows how many DDC/CI-capable monitors are detected; click it to open the controls panel.
-- **The panel opens on a monitor arrangement grid**: every output `wlr-randr` reports as a tile on a 3x3 grid of
-  cells. Drag a tile to another cell to move that monitor relative to the others -- the new arrangement is applied
-  live via `wlr-randr --pos`, and dropping onto a cell that's already occupied swaps the two. Select a tile and press
-  **Configurações** to open that monitor's DDC/CI settings (below); a back arrow returns to the grid.
-- The arrangement persists to the plugin's own data directory (`layout.json`, as cell assignments rather than raw
-  pixel positions) -- never to the compositor's own config, which on a Nix/home-manager setup is read-only -- and is
-  reapplied automatically the next time Noctalia starts.
-- The two halves are independent: no `wlr-randr` means no grid but working DDC/CI controls, and no `ddcutil` means a
-  working grid with the settings button disabled.
-- Each monitor's settings screen lists every VCP feature `ddcutil capabilities` +
-  `ddcutil vcpinfo --verbose` report, classified into the right control automatically:
-  - **Read Write, Continuous** -> slider (brightness, contrast, RGB gain, ...)
-  - **Read Write, Non-Continuous with a value list** -> dropdown (input source, picture mode, ...)
-  - **Write Only** -> trigger button
-  - Everything else -> read-only text
-  - Audio speaker volume (`62`) gets a mute toggle composited onto its slider from Audio mute (`8D`)
-- A Refresh button re-runs `ddcutil detect` and re-reads every monitor's capabilities/values, and re-reads
-  `wlr-randr --json` so a monitor plugged in since the last scan shows up on the grid (nothing polls
-  continuously -- DDC/CI queries are slow I2C round-trips).
-- All writes are fire-and-forget `ddcutil setvcp` calls with an optimistic local update; a failed write surfaces a
-  notification.
-- Manufacturer-specific picture-mode names (e.g. ASUS's GameVisual presets) aren't known to `ddcutil` at all -- see
-  [`monitor-settings/devices/`](monitor-settings/devices/README.md) for the community-contributed, per-model override
-  files that fix this without touching any plugin code.
+## Using it
+
+- **Arrangement:** drag a monitor anywhere on the canvas. While dragging, an outline shows where it will land. On
+  release it snaps flush against the nearest edges, never overlaps another monitor, and never floats off on its own
+  (a gap between monitors is a dead zone the cursor can't cross). Click a monitor to select it. Disabled outputs
+  aren't on the canvas, so they're selected (and turned on) from the button row below it.
+- **Display tab:** resolution and refresh rate come from the modes the output advertises. Rotation offers all eight
+  `wl_output` transforms, plus quick rotate buttons. Scale takes a preset or any custom value. DPI shows the monitor's
+  physical and effective DPI (from its EDID size), and a target-DPI field derives the scale from it. Wayland has no
+  per-monitor DPI separate from scale: scale *is* that setting. X/Y set an exact position.
+- **Apply:** edits are a draft until **Apply**, which sends every change as **one atomic `wlr-randr` call**.
+  - Changes limited to position or adaptive sync are kept right away.
+  - Riskier changes (mode, scale, rotation, on/off) must be confirmed within 15 seconds, or they're rolled back
+    automatically.
+- **Persistence:** confirmed configs are saved to `~/.local/share/quickshell/by-shell/heprado-monitor-settings/
+  displays.json`, keyed by connector name. Nothing is written to the compositor's own config, which on a
+  Nix/home-manager setup is read-only. They're reapplied at the next login.
+- **DDC/CI tab:** shows the controls for the selected output's monitor. The output is matched to its `ddcutil`
+  display by DRM connector, falling back to the model name. Every VCP feature that `ddcutil capabilities` +
+  `ddcutil vcpinfo --verbose` report becomes the right control:
+  - **Read Write, Continuous** → slider plus an exact value (brightness, contrast, RGB gain with a color gradient, ...)
+  - **Read Write, Non-Continuous with a value list** → dropdown (input source, picture mode, ...)
+  - **Write Only** → trigger button
+  - everything else → read-only text
+  - Audio speaker volume (`62`) gets a mute toggle from Audio mute (`8D`).
+
+  Writes are `ddcutil setvcp` calls with an optimistic update; nothing polls, because DDC/CI queries are slow I2C
+  round-trips. **Refresh** re-reads both outputs and monitors.
+- Manufacturer-specific picture-mode names (e.g. ASUS's GameVisual presets) aren't known to `ddcutil` at all. See
+  [`monitor-settings/devices/`](monitor-settings/devices/README.md) for the community-contributed per-manufacturer
+  override files.
+
+The window's app id (Hyprland's `class`) is `heprado.monitor-settings`, for a compositor rule that floats it.
 
 ## Installing locally (development)
 
@@ -57,8 +92,13 @@ mkdir -p "$XDG_DATA_HOME/noctalia/plugins"
 ln -s "$(pwd)/noctalia-monitor-settings/monitor-settings" "$XDG_DATA_HOME/noctalia/plugins/monitor-settings"
 ```
 
-Then enable it once from Noctalia's plugin settings. `.luau` edits hot-reload automatically; `plugin.toml` changes
-need a config reload.
+Then enable it once from Noctalia's plugin settings. The app can also be run on its own while working on it, and
+reloads on save:
+
+```sh
+quickshell -p monitor-settings/app
+node monitor-settings/app/tests/run.mjs   # parsing/layout tests
+```
 
 ## Installing as a source
 
@@ -73,7 +113,7 @@ Then enable **Monitor Settings (DDC/CI)** from the plugin store.
 
 ## Status
 
-First working version -- built and tested against the ddcutil parsing logic already proven in tama-shell, but not
-yet run against real hardware through Noctalia itself. If a monitor's `capabilities`/`vcpinfo` output doesn't parse
-the way it does on the ASUS VG278QR this was originally developed against, please open an issue with the raw
-`ddcutil capabilities --verbose` / `ddcutil vcpinfo --verbose` output for that monitor.
+The app has been exercised end to end under a headless Sway (real drag and drop, apply, confirm/auto-revert,
+login reapply) with a stand-in `ddcutil`, but not yet on real hardware. If a monitor's `capabilities`/`vcpinfo`
+output doesn't parse the way it does on the ASUS VG278QR this was originally developed against, please open an issue
+with the raw `ddcutil capabilities --verbose` / `ddcutil vcpinfo --verbose` output for that monitor.

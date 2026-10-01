@@ -9,18 +9,50 @@
     "trigger": "触发",
     "display_fallback": "显示器 {id}"
   },
-  "widget": {
-    "detecting": "正在检测显示器…",
-    "click_to_check": "点击以检测 DDC/CI 显示器",
-    "none_detected": "未检测到 DDC/CI 显示器",
-    "monitors_found": {
-      "one": "{count} 台支持 DDC/CI 的显示器",
-      "other": "{count} 台支持 DDC/CI 的显示器"
-    }
-  },
   "launcher": {
     "title": "显示器设置",
     "subtitle": "布局与显示器设置"
+  },
+  "display": {
+    "canvas_hint": "拖动显示器即可移动，它会自动贴合相邻的显示器。点击“应用”后更改才会生效。",
+    "enabled": "启用",
+    "off": "关闭",
+    "resolution": "分辨率",
+    "rotation": "旋转",
+    "rotate_cw": "顺时针旋转",
+    "rotate_ccw": "逆时针旋转",
+    "scale": "缩放",
+    "custom_scale": "自定义",
+    "dpi": "DPI",
+    "dpi_value": "物理 {physical} · 有效 {effective}",
+    "target_dpi": "目标 DPI",
+    "dpi_unknown": "未知——此显示器未报告其物理尺寸。",
+    "adaptive_sync": "自适应同步 (FreeSync / G-Sync)",
+    "adaptive_sync_unsupported": "合成器不支持",
+    "position": "位置",
+    "logical_size": "逻辑 {width} × {height}",
+    "apply": "应用",
+    "discard": "放弃",
+    "confirm": "保留这些显示设置吗？{seconds} 秒后将还原。",
+    "keep": "保留",
+    "revert": "还原",
+    "ddc_header": "DDC/CI",
+    "tab_display": "显示",
+    "no_outputs": "wlr-randr 未报告任何输出。",
+    "loading": "正在读取输出…"
+  },
+  "ddc": {
+    "mute": "静音"
+  },
+  "transform": {
+    "normal": "正常",
+    "90": "90°",
+    "180": "180°",
+    "270": "270°",
+    "flipped": "翻转",
+    "flipped_90": "翻转 90°",
+    "flipped_180": "翻转 180°",
+    "flipped_270": "翻转 270°"
   },
   "category": {
     "image": "图像",
@@ -335,8 +367,9 @@
     "df": "MCCS 版本"
   },
   "errors": {
-    "move_failed": "移动 {name} 失败",
-    "setvcp_failed": "无法在显示器 {id} 上设置 {code}"
+    "setvcp_failed": "无法在显示器 {id} 上设置 {code}",
+    "apply_failed": "无法应用显示设置：{error}",
+    "quickshell_missing": "显示器设置需要安装 Quickshell（`quickshell` 命令）。"
   },
   "readonly": {
     "no_data": "无数据"

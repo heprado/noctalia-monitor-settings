@@ -9,18 +9,50 @@
     "trigger": "Activar",
     "display_fallback": "Pantalla {id}"
   },
-  "widget": {
-    "detecting": "Detectando monitores…",
-    "click_to_check": "Haz clic para buscar monitores DDC/CI",
-    "none_detected": "No se detectaron monitores DDC/CI",
-    "monitors_found": {
-      "one": "{count} monitor con control DDC/CI",
-      "other": "{count} monitores con control DDC/CI"
-    }
-  },
   "launcher": {
     "title": "Configuración de Monitor",
     "subtitle": "Disposición y configuración de monitores"
+  },
+  "display": {
+    "canvas_hint": "Arrastra un monitor para moverlo -- se ajusta junto a sus vecinos. Los cambios se aplican con Aplicar.",
+    "enabled": "Activado",
+    "off": "apagado",
+    "resolution": "Resolución",
+    "rotation": "Rotación",
+    "rotate_cw": "Girar en sentido horario",
+    "rotate_ccw": "Girar en sentido antihorario",
+    "scale": "Escala",
+    "custom_scale": "Personalizada",
+    "dpi": "PPP",
+    "dpi_value": "{physical} físico · {effective} efectivo",
+    "target_dpi": "PPP deseado",
+    "dpi_unknown": "Desconocido -- este monitor no informa su tamaño físico.",
+    "adaptive_sync": "Sincronización adaptativa (FreeSync / G-Sync)",
+    "adaptive_sync_unsupported": "No compatible con el compositor",
+    "position": "Posición",
+    "logical_size": "{width} × {height} lógico",
+    "apply": "Aplicar",
+    "discard": "Descartar",
+    "confirm": "¿Conservar esta configuración de pantalla? Se revertirá en {seconds} s.",
+    "keep": "Conservar",
+    "revert": "Revertir",
+    "ddc_header": "DDC/CI",
+    "tab_display": "Pantalla",
+    "no_outputs": "wlr-randr no informa ninguna salida.",
+    "loading": "Leyendo salidas…"
+  },
+  "ddc": {
+    "mute": "Silenciar"
+  },
+  "transform": {
+    "normal": "Normal",
+    "90": "90°",
+    "180": "180°",
+    "270": "270°",
+    "flipped": "Volteado",
+    "flipped_90": "Volteado 90°",
+    "flipped_180": "Volteado 180°",
+    "flipped_270": "Volteado 270°"
   },
   "category": {
     "image": "Imagen",
@@ -335,8 +367,9 @@
     "df": "Versión de MCCS"
   },
   "errors": {
-    "move_failed": "No se pudo mover {name}",
-    "setvcp_failed": "No se pudo establecer {code} en la pantalla {id}"
+    "setvcp_failed": "No se pudo establecer {code} en la pantalla {id}",
+    "apply_failed": "No se pudo aplicar la configuración de pantalla: {error}",
+    "quickshell_missing": "Configuración de monitor necesita Quickshell (el comando `quickshell`) instalado."
   },
   "readonly": {
     "no_data": "Sin datos"
