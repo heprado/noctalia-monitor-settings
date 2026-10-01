@@ -18,3 +18,7 @@ trace.json
 
 # Internal planning/spec docs -- not meant for the public repo
 docs/superpowers/
+
+# nix build output
+result
+result-*

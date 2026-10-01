@@ -111,6 +111,37 @@ noctalia msg plugins source add heprado-monitor-settings git https://github.com/
 
 Then enable **Monitor Settings (DDC/CI)** from the plugin store.
 
+## Installing with Nix (without Noctalia)
+
+The app doesn't need Noctalia at all: the flake packages it on its own, with `quickshell`, `wlr-randr` and `ddcutil`
+on its `PATH`, a `monitor-settings` command and a desktop entry.
+
+```sh
+nix run github:heprado/noctalia-monitor-settings              # open the window (again: close it)
+nix run github:heprado/noctalia-monitor-settings -- --reapply # reapply the saved layout and exit
+```
+
+With home-manager, the module also takes over the Noctalia service's job: a oneshot user service bound to
+`graphical-session.target` reapplies the saved layout at login.
+
+```nix
+{
+  inputs.monitor-settings.url = "github:heprado/noctalia-monitor-settings";
+  inputs.monitor-settings.inputs.nixpkgs.follows = "nixpkgs";
+
+  # in your home-manager configuration:
+  imports = [ inputs.monitor-settings.homeManagerModules.default ];
+  programs.monitor-settings.enable = true;
+  # programs.monitor-settings.reapplyAtLogin = false;  # to skip the login service
+}
+```
+
+The login service needs a compositor started through systemd (UWSM, or its own systemd integration), so that
+`graphical-session.target` and `WAYLAND_DISPLAY` reach user services. Both installs share the same saved layout
+(`~/.local/share/quickshell/by-shell/heprado-monitor-settings/displays.json`), so moving from the plugin to the flake
+keeps it. Having both at once is harmless, just redundant: the second reapply at login finds nothing left to change.
+`nix flake check` runs the parsing/layout tests.
+
 ## Status
 
 The app has been exercised end to end under a headless Sway (real drag and drop, apply, confirm/auto-revert,
