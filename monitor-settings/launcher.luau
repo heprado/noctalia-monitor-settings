@@ -4,10 +4,11 @@
 -- Answers behind the "/monitor" prefix and also the plain global search
 -- (include_in_global_search = true in plugin.toml) -- typing "monitor" (or
 -- anything that fuzzy-matches it) anywhere in the launcher surfaces one
--- result that opens the panel. No ddcutil calls here; the panel itself
--- triggers the service's lazy first load on open (see panel.luau/onOpen).
+-- result that opens the app.
 
-local RESULT_ID = "open-panel"
+local app = require("./lib/app.luau")
+
+local RESULT_ID = "open-app"
 
 function onQuery(text)
   local title = noctalia.tr("launcher.title")
@@ -35,6 +36,6 @@ end
 
 function onActivate(id)
   if id == RESULT_ID then
-    noctalia.togglePanel("heprado/monitor-settings:panel")
+    app.toggle()
   end
 end

@@ -7,25 +7,14 @@
     "arrangement_unsupported": "Для расположения мониторов требуется wlr-randr и композитор с поддержкой wlr-output-management (Hyprland, Sway, river и др.).",
     "settings_unavailable": "Настройки DDC/CI недоступны для этого монитора.",
     "trigger": "Выполнить",
-    "display_fallback": "Дисплей {id}",
-    "reverted": "Настройки дисплея возвращены."
-  },
-  "widget": {
-    "detecting": "Поиск мониторов…",
-    "click_to_check": "Нажмите, чтобы проверить мониторы DDC/CI",
-    "none_detected": "Мониторы DDC/CI не обнаружены",
-    "monitors_found": {
-      "one": "{count} монитор с поддержкой DDC/CI",
-      "other": "{count} мониторов с поддержкой DDC/CI"
-    }
+    "display_fallback": "Дисплей {id}"
   },
   "launcher": {
     "title": "Настройки монитора",
     "subtitle": "Расположение и настройки монитора"
   },
   "display": {
-    "canvas_hint": "Перетащите монитор за его имя, чтобы переместить -- он прилипает к соседним. Изменения вступают в силу после «Применить».",
-    "drag_hint": "Перетащите, чтобы переместить монитор",
+    "canvas_hint": "Перетащите монитор, чтобы переместить -- он прилипает к соседним. Изменения вступают в силу после «Применить».",
     "enabled": "Включён",
     "off": "выкл.",
     "resolution": "Разрешение",
@@ -47,7 +36,13 @@
     "confirm": "Сохранить эти настройки дисплея? Возврат через {seconds} с.",
     "keep": "Сохранить",
     "revert": "Вернуть",
-    "ddc_header": "DDC/CI"
+    "ddc_header": "DDC/CI",
+    "tab_display": "Дисплей",
+    "no_outputs": "wlr-randr не сообщает ни одного выхода.",
+    "loading": "Чтение выходов…"
+  },
+  "ddc": {
+    "mute": "Без звука"
   },
   "transform": {
     "normal": "Обычный",
@@ -373,7 +368,8 @@
   },
   "errors": {
     "setvcp_failed": "Не удалось установить {code} на дисплее {id}",
-    "apply_failed": "Не удалось применить настройки дисплея: {error}"
+    "apply_failed": "Не удалось применить настройки дисплея: {error}",
+    "quickshell_missing": "Для настроек монитора нужен установленный Quickshell (команда `quickshell`)."
   },
   "readonly": {
     "no_data": "Нет данных"

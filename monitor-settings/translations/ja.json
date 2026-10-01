@@ -7,25 +7,14 @@
     "arrangement_unsupported": "モニター配置機能には wlr-randr と、wlr-output-management に対応したコンポジター（Hyprland、Sway、river など）が必要です。",
     "settings_unavailable": "このモニターでは DDC/CI 設定を利用できません。",
     "trigger": "実行",
-    "display_fallback": "ディスプレイ {id}",
-    "reverted": "ディスプレイ設定を元に戻しました。"
-  },
-  "widget": {
-    "detecting": "モニターを検出中…",
-    "click_to_check": "クリックして DDC/CI モニターを確認",
-    "none_detected": "DDC/CI モニターが検出されませんでした",
-    "monitors_found": {
-      "one": "DDC/CI 対応モニター {count} 台",
-      "other": "DDC/CI 対応モニター {count} 台"
-    }
+    "display_fallback": "ディスプレイ {id}"
   },
   "launcher": {
     "title": "モニター設定",
     "subtitle": "配置とモニター設定"
   },
   "display": {
-    "canvas_hint": "モニターを名前の部分でドラッグして移動します。隣のモニターにぴったり吸着します。変更は「適用」で反映されます。",
-    "drag_hint": "ドラッグしてこのモニターを移動",
+    "canvas_hint": "モニターをドラッグして移動します。隣のモニターにぴったり吸着します。変更は「適用」で反映されます。",
     "enabled": "有効",
     "off": "オフ",
     "resolution": "解像度",
@@ -47,7 +36,13 @@
     "confirm": "このディスプレイ設定を維持しますか？ {seconds} 秒後に元に戻ります。",
     "keep": "維持",
     "revert": "元に戻す",
-    "ddc_header": "DDC/CI"
+    "ddc_header": "DDC/CI",
+    "tab_display": "ディスプレイ",
+    "no_outputs": "wlr-randr が出力を報告していません。",
+    "loading": "出力を読み込み中…"
+  },
+  "ddc": {
+    "mute": "ミュート"
   },
   "transform": {
     "normal": "標準",
@@ -373,7 +368,8 @@
   },
   "errors": {
     "setvcp_failed": "ディスプレイ {id} で {code} を設定できませんでした",
-    "apply_failed": "ディスプレイ設定を適用できませんでした: {error}"
+    "apply_failed": "ディスプレイ設定を適用できませんでした: {error}",
+    "quickshell_missing": "モニター設定には Quickshell（`quickshell` コマンド）のインストールが必要です。"
   },
   "readonly": {
     "no_data": "データなし"

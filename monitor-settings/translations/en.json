@@ -7,25 +7,14 @@
     "arrangement_unsupported": "Monitor arrangement requires wlr-randr and a compositor that supports wlr-output-management (Hyprland, Sway, river, ...).",
     "settings_unavailable": "DDC/CI settings aren't available for this monitor.",
     "trigger": "Trigger",
-    "display_fallback": "Display {id}",
-    "reverted": "Display settings reverted."
-  },
-  "widget": {
-    "detecting": "Detecting monitors…",
-    "click_to_check": "Click to check for DDC/CI monitors",
-    "none_detected": "No DDC/CI monitors detected",
-    "monitors_found": {
-      "one": "{count} monitor with DDC/CI control",
-      "other": "{count} monitors with DDC/CI control"
-    }
+    "display_fallback": "Display {id}"
   },
   "launcher": {
     "title": "Monitor Settings",
     "subtitle": "Layout and Monitor Settings"
   },
   "display": {
-    "canvas_hint": "Drag a monitor by its name to move it -- it snaps flush against its neighbours. Changes take effect on Apply.",
-    "drag_hint": "Drag to move this monitor",
+    "canvas_hint": "Drag a monitor to move it -- it snaps flush against its neighbours. Changes take effect on Apply.",
     "enabled": "Enabled",
     "off": "off",
     "resolution": "Resolution",
@@ -47,7 +36,13 @@
     "confirm": "Keep these display settings? Reverting in {seconds} s.",
     "keep": "Keep",
     "revert": "Revert",
-    "ddc_header": "DDC/CI"
+    "ddc_header": "DDC/CI",
+    "tab_display": "Display",
+    "no_outputs": "No outputs reported by wlr-randr.",
+    "loading": "Reading outputs…"
+  },
+  "ddc": {
+    "mute": "Mute"
   },
   "transform": {
     "normal": "Normal",
@@ -373,7 +368,8 @@
   },
   "errors": {
     "setvcp_failed": "Failed to set {code} on display {id}",
-    "apply_failed": "Failed to apply display settings: {error}"
+    "apply_failed": "Failed to apply display settings: {error}",
+    "quickshell_missing": "Monitor Settings needs Quickshell (the `quickshell` command) to be installed."
   },
   "readonly": {
     "no_data": "No data"

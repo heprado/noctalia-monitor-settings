@@ -7,25 +7,14 @@
     "arrangement_unsupported": "O arranjo de monitores exige o wlr-randr e um compositor com suporte a wlr-output-management (Hyprland, Sway, river, ...).",
     "settings_unavailable": "As configurações DDC/CI não estão disponíveis para este monitor.",
     "trigger": "Acionar",
-    "display_fallback": "Tela {id}",
-    "reverted": "Configurações de tela revertidas."
-  },
-  "widget": {
-    "detecting": "Detectando monitores…",
-    "click_to_check": "Clique para verificar monitores DDC/CI",
-    "none_detected": "Nenhum monitor DDC/CI detectado",
-    "monitors_found": {
-      "one": "{count} monitor com controle DDC/CI",
-      "other": "{count} monitores com controle DDC/CI"
-    }
+    "display_fallback": "Tela {id}"
   },
   "launcher": {
     "title": "Configurações de Monitor",
     "subtitle": "Layout e configurações de monitor"
   },
   "display": {
-    "canvas_hint": "Arraste um monitor pelo nome para movê-lo -- ele encaixa rente aos vizinhos. As mudanças valem ao clicar em Aplicar.",
-    "drag_hint": "Arraste para mover este monitor",
+    "canvas_hint": "Arraste um monitor para movê-lo -- ele encaixa rente aos vizinhos. As mudanças valem ao clicar em Aplicar.",
     "enabled": "Ativo",
     "off": "desligado",
     "resolution": "Resolução",
@@ -47,7 +36,13 @@
     "confirm": "Manter estas configurações de tela? Revertendo em {seconds} s.",
     "keep": "Manter",
     "revert": "Reverter",
-    "ddc_header": "DDC/CI"
+    "ddc_header": "DDC/CI",
+    "tab_display": "Tela",
+    "no_outputs": "Nenhuma saída informada pelo wlr-randr.",
+    "loading": "Lendo saídas…"
+  },
+  "ddc": {
+    "mute": "Mudo"
   },
   "transform": {
     "normal": "Normal",
@@ -373,7 +368,8 @@
   },
   "errors": {
     "setvcp_failed": "Falha ao definir {code} na tela {id}",
-    "apply_failed": "Falha ao aplicar as configurações de tela: {error}"
+    "apply_failed": "Falha ao aplicar as configurações de tela: {error}",
+    "quickshell_missing": "O Configurações de Monitor precisa do Quickshell (o comando `quickshell`) instalado."
   },
   "readonly": {
     "no_data": "Sem dados"

@@ -7,25 +7,14 @@
     "arrangement_unsupported": "Die Monitoranordnung erfordert wlr-randr und einen Compositor mit Unterstützung für wlr-output-management (Hyprland, Sway, river, ...).",
     "settings_unavailable": "Die DDC/CI-Einstellungen sind für diesen Monitor nicht verfügbar.",
     "trigger": "Auslösen",
-    "display_fallback": "Bildschirm {id}",
-    "reverted": "Anzeigeeinstellungen zurückgesetzt."
-  },
-  "widget": {
-    "detecting": "Monitore werden erkannt…",
-    "click_to_check": "Klicken, um nach DDC/CI-Monitoren zu suchen",
-    "none_detected": "Keine DDC/CI-Monitore erkannt",
-    "monitors_found": {
-      "one": "{count} Monitor mit DDC/CI-Steuerung",
-      "other": "{count} Monitore mit DDC/CI-Steuerung"
-    }
+    "display_fallback": "Bildschirm {id}"
   },
   "launcher": {
     "title": "Monitoreinstellungen",
     "subtitle": "Anordnung und Monitoreinstellungen"
   },
   "display": {
-    "canvas_hint": "Ziehe einen Monitor an seinem Namen, um ihn zu verschieben -- er rastet bündig an seinen Nachbarn ein. Änderungen gelten erst mit Anwenden.",
-    "drag_hint": "Ziehen, um diesen Monitor zu verschieben",
+    "canvas_hint": "Ziehe einen Monitor, um ihn zu verschieben -- er rastet bündig an seinen Nachbarn ein. Änderungen gelten erst mit Anwenden.",
     "enabled": "Aktiv",
     "off": "aus",
     "resolution": "Auflösung",
@@ -47,7 +36,13 @@
     "confirm": "Diese Anzeigeeinstellungen behalten? Zurücksetzen in {seconds} s.",
     "keep": "Behalten",
     "revert": "Zurücksetzen",
-    "ddc_header": "DDC/CI"
+    "ddc_header": "DDC/CI",
+    "tab_display": "Anzeige",
+    "no_outputs": "wlr-randr meldet keine Ausgänge.",
+    "loading": "Ausgänge werden gelesen…"
+  },
+  "ddc": {
+    "mute": "Stumm"
   },
   "transform": {
     "normal": "Normal",
@@ -373,7 +368,8 @@
   },
   "errors": {
     "setvcp_failed": "{code} konnte auf Bildschirm {id} nicht gesetzt werden",
-    "apply_failed": "Anzeigeeinstellungen konnten nicht angewendet werden: {error}"
+    "apply_failed": "Anzeigeeinstellungen konnten nicht angewendet werden: {error}",
+    "quickshell_missing": "Monitoreinstellungen benötigt ein installiertes Quickshell (den Befehl `quickshell`)."
   },
   "readonly": {
     "no_data": "Keine Daten"
