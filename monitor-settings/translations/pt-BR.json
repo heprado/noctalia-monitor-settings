@@ -7,7 +7,8 @@
     "arrangement_unsupported": "O arranjo de monitores exige o wlr-randr e um compositor com suporte a wlr-output-management (Hyprland, Sway, river, ...).",
     "settings_unavailable": "As configurações DDC/CI não estão disponíveis para este monitor.",
     "trigger": "Acionar",
-    "display_fallback": "Tela {id}"
+    "display_fallback": "Tela {id}",
+    "reverted": "Configurações de tela revertidas."
   },
   "widget": {
     "detecting": "Detectando monitores…",
@@ -21,6 +22,42 @@
   "launcher": {
     "title": "Configurações de Monitor",
     "subtitle": "Layout e configurações de monitor"
+  },
+  "display": {
+    "canvas_hint": "Arraste um monitor pelo nome para movê-lo -- ele encaixa rente aos vizinhos. As mudanças valem ao clicar em Aplicar.",
+    "drag_hint": "Arraste para mover este monitor",
+    "enabled": "Ativo",
+    "off": "desligado",
+    "resolution": "Resolução",
+    "rotation": "Rotação",
+    "rotate_cw": "Girar no sentido horário",
+    "rotate_ccw": "Girar no sentido anti-horário",
+    "scale": "Escala",
+    "custom_scale": "Personalizada",
+    "dpi": "DPI",
+    "dpi_value": "{physical} físico · {effective} efetivo",
+    "target_dpi": "DPI desejado",
+    "dpi_unknown": "Desconhecido -- este monitor não informa o tamanho físico.",
+    "adaptive_sync": "Sincronização adaptativa (FreeSync / G-Sync)",
+    "adaptive_sync_unsupported": "Não suportado pelo compositor",
+    "position": "Posição",
+    "logical_size": "{width} × {height} lógico",
+    "apply": "Aplicar",
+    "discard": "Descartar",
+    "confirm": "Manter estas configurações de tela? Revertendo em {seconds} s.",
+    "keep": "Manter",
+    "revert": "Reverter",
+    "ddc_header": "DDC/CI"
+  },
+  "transform": {
+    "normal": "Normal",
+    "90": "90°",
+    "180": "180°",
+    "270": "270°",
+    "flipped": "Espelhado",
+    "flipped_90": "Espelhado 90°",
+    "flipped_180": "Espelhado 180°",
+    "flipped_270": "Espelhado 270°"
   },
   "category": {
     "image": "Imagem",
@@ -335,8 +372,8 @@
     "df": "Versão do MCCS"
   },
   "errors": {
-    "move_failed": "Falha ao mover {name}",
-    "setvcp_failed": "Falha ao definir {code} na tela {id}"
+    "setvcp_failed": "Falha ao definir {code} na tela {id}",
+    "apply_failed": "Falha ao aplicar as configurações de tela: {error}"
   },
   "readonly": {
     "no_data": "Sem dados"

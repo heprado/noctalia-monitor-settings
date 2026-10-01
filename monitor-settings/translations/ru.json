@@ -7,7 +7,8 @@
     "arrangement_unsupported": "Для расположения мониторов требуется wlr-randr и композитор с поддержкой wlr-output-management (Hyprland, Sway, river и др.).",
     "settings_unavailable": "Настройки DDC/CI недоступны для этого монитора.",
     "trigger": "Выполнить",
-    "display_fallback": "Дисплей {id}"
+    "display_fallback": "Дисплей {id}",
+    "reverted": "Настройки дисплея возвращены."
   },
   "widget": {
     "detecting": "Поиск мониторов…",
@@ -21,6 +22,42 @@
   "launcher": {
     "title": "Настройки монитора",
     "subtitle": "Расположение и настройки монитора"
+  },
+  "display": {
+    "canvas_hint": "Перетащите монитор за его имя, чтобы переместить -- он прилипает к соседним. Изменения вступают в силу после «Применить».",
+    "drag_hint": "Перетащите, чтобы переместить монитор",
+    "enabled": "Включён",
+    "off": "выкл.",
+    "resolution": "Разрешение",
+    "rotation": "Поворот",
+    "rotate_cw": "Повернуть по часовой",
+    "rotate_ccw": "Повернуть против часовой",
+    "scale": "Масштаб",
+    "custom_scale": "Свой",
+    "dpi": "DPI",
+    "dpi_value": "{physical} физ. · {effective} эфф.",
+    "target_dpi": "Целевой DPI",
+    "dpi_unknown": "Неизвестно -- монитор не сообщает свой физический размер.",
+    "adaptive_sync": "Адаптивная синхронизация (FreeSync / G-Sync)",
+    "adaptive_sync_unsupported": "Не поддерживается композитором",
+    "position": "Позиция",
+    "logical_size": "{width} × {height} логич.",
+    "apply": "Применить",
+    "discard": "Отменить",
+    "confirm": "Сохранить эти настройки дисплея? Возврат через {seconds} с.",
+    "keep": "Сохранить",
+    "revert": "Вернуть",
+    "ddc_header": "DDC/CI"
+  },
+  "transform": {
+    "normal": "Обычный",
+    "90": "90°",
+    "180": "180°",
+    "270": "270°",
+    "flipped": "Отражённый",
+    "flipped_90": "Отражённый 90°",
+    "flipped_180": "Отражённый 180°",
+    "flipped_270": "Отражённый 270°"
   },
   "category": {
     "image": "Изображение",
@@ -335,8 +372,8 @@
     "df": "Версия MCCS"
   },
   "errors": {
-    "move_failed": "Не удалось переместить {name}",
-    "setvcp_failed": "Не удалось установить {code} на дисплее {id}"
+    "setvcp_failed": "Не удалось установить {code} на дисплее {id}",
+    "apply_failed": "Не удалось применить настройки дисплея: {error}"
   },
   "readonly": {
     "no_data": "Нет данных"

@@ -7,7 +7,8 @@
     "arrangement_unsupported": "Monitor arrangement requires wlr-randr and a compositor that supports wlr-output-management (Hyprland, Sway, river, ...).",
     "settings_unavailable": "DDC/CI settings aren't available for this monitor.",
     "trigger": "Trigger",
-    "display_fallback": "Display {id}"
+    "display_fallback": "Display {id}",
+    "reverted": "Display settings reverted."
   },
   "widget": {
     "detecting": "Detecting monitors…",
@@ -21,6 +22,42 @@
   "launcher": {
     "title": "Monitor Settings",
     "subtitle": "Layout and Monitor Settings"
+  },
+  "display": {
+    "canvas_hint": "Drag a monitor by its name to move it -- it snaps flush against its neighbours. Changes take effect on Apply.",
+    "drag_hint": "Drag to move this monitor",
+    "enabled": "Enabled",
+    "off": "off",
+    "resolution": "Resolution",
+    "rotation": "Rotation",
+    "rotate_cw": "Rotate clockwise",
+    "rotate_ccw": "Rotate counter-clockwise",
+    "scale": "Scale",
+    "custom_scale": "Custom",
+    "dpi": "DPI",
+    "dpi_value": "{physical} physical · {effective} effective",
+    "target_dpi": "Target DPI",
+    "dpi_unknown": "Unknown -- this monitor doesn't report its physical size.",
+    "adaptive_sync": "Adaptive sync (FreeSync / G-Sync)",
+    "adaptive_sync_unsupported": "Not supported by the compositor",
+    "position": "Position",
+    "logical_size": "{width} × {height} logical",
+    "apply": "Apply",
+    "discard": "Discard",
+    "confirm": "Keep these display settings? Reverting in {seconds} s.",
+    "keep": "Keep",
+    "revert": "Revert",
+    "ddc_header": "DDC/CI"
+  },
+  "transform": {
+    "normal": "Normal",
+    "90": "90°",
+    "180": "180°",
+    "270": "270°",
+    "flipped": "Flipped",
+    "flipped_90": "Flipped 90°",
+    "flipped_180": "Flipped 180°",
+    "flipped_270": "Flipped 270°"
   },
   "category": {
     "image": "Image",
@@ -335,8 +372,8 @@
     "df": "MCCS version"
   },
   "errors": {
-    "move_failed": "Failed to move {name}",
-    "setvcp_failed": "Failed to set {code} on display {id}"
+    "setvcp_failed": "Failed to set {code} on display {id}",
+    "apply_failed": "Failed to apply display settings: {error}"
   },
   "readonly": {
     "no_data": "No data"

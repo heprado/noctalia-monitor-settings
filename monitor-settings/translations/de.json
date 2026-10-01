@@ -7,7 +7,8 @@
     "arrangement_unsupported": "Die Monitoranordnung erfordert wlr-randr und einen Compositor mit Unterstützung für wlr-output-management (Hyprland, Sway, river, ...).",
     "settings_unavailable": "Die DDC/CI-Einstellungen sind für diesen Monitor nicht verfügbar.",
     "trigger": "Auslösen",
-    "display_fallback": "Bildschirm {id}"
+    "display_fallback": "Bildschirm {id}",
+    "reverted": "Anzeigeeinstellungen zurückgesetzt."
   },
   "widget": {
     "detecting": "Monitore werden erkannt…",
@@ -21,6 +22,42 @@
   "launcher": {
     "title": "Monitoreinstellungen",
     "subtitle": "Anordnung und Monitoreinstellungen"
+  },
+  "display": {
+    "canvas_hint": "Ziehe einen Monitor an seinem Namen, um ihn zu verschieben -- er rastet bündig an seinen Nachbarn ein. Änderungen gelten erst mit Anwenden.",
+    "drag_hint": "Ziehen, um diesen Monitor zu verschieben",
+    "enabled": "Aktiv",
+    "off": "aus",
+    "resolution": "Auflösung",
+    "rotation": "Drehung",
+    "rotate_cw": "Im Uhrzeigersinn drehen",
+    "rotate_ccw": "Gegen den Uhrzeigersinn drehen",
+    "scale": "Skalierung",
+    "custom_scale": "Eigene",
+    "dpi": "DPI",
+    "dpi_value": "{physical} physisch · {effective} effektiv",
+    "target_dpi": "Ziel-DPI",
+    "dpi_unknown": "Unbekannt -- dieser Monitor meldet seine physische Größe nicht.",
+    "adaptive_sync": "Adaptive Synchronisation (FreeSync / G-Sync)",
+    "adaptive_sync_unsupported": "Vom Compositor nicht unterstützt",
+    "position": "Position",
+    "logical_size": "{width} × {height} logisch",
+    "apply": "Anwenden",
+    "discard": "Verwerfen",
+    "confirm": "Diese Anzeigeeinstellungen behalten? Zurücksetzen in {seconds} s.",
+    "keep": "Behalten",
+    "revert": "Zurücksetzen",
+    "ddc_header": "DDC/CI"
+  },
+  "transform": {
+    "normal": "Normal",
+    "90": "90°",
+    "180": "180°",
+    "270": "270°",
+    "flipped": "Gespiegelt",
+    "flipped_90": "Gespiegelt 90°",
+    "flipped_180": "Gespiegelt 180°",
+    "flipped_270": "Gespiegelt 270°"
   },
   "category": {
     "image": "Bild",
@@ -335,8 +372,8 @@
     "df": "MCCS-Version"
   },
   "errors": {
-    "move_failed": "Verschieben von {name} fehlgeschlagen",
-    "setvcp_failed": "{code} konnte auf Bildschirm {id} nicht gesetzt werden"
+    "setvcp_failed": "{code} konnte auf Bildschirm {id} nicht gesetzt werden",
+    "apply_failed": "Anzeigeeinstellungen konnten nicht angewendet werden: {error}"
   },
   "readonly": {
     "no_data": "Keine Daten"

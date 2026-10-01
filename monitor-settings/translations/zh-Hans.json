@@ -7,7 +7,8 @@
     "arrangement_unsupported": "显示器排列功能需要 wlr-randr 以及支持 wlr-output-management 的合成器（Hyprland、Sway、river 等）。",
     "settings_unavailable": "此显示器没有可用的 DDC/CI 设置。",
     "trigger": "触发",
-    "display_fallback": "显示器 {id}"
+    "display_fallback": "显示器 {id}",
+    "reverted": "显示设置已还原。"
   },
   "widget": {
     "detecting": "正在检测显示器…",
@@ -21,6 +22,42 @@
   "launcher": {
     "title": "显示器设置",
     "subtitle": "布局与显示器设置"
+  },
+  "display": {
+    "canvas_hint": "拖动显示器名称即可移动它，它会自动贴合相邻的显示器。点击“应用”后更改才会生效。",
+    "drag_hint": "拖动以移动此显示器",
+    "enabled": "启用",
+    "off": "关闭",
+    "resolution": "分辨率",
+    "rotation": "旋转",
+    "rotate_cw": "顺时针旋转",
+    "rotate_ccw": "逆时针旋转",
+    "scale": "缩放",
+    "custom_scale": "自定义",
+    "dpi": "DPI",
+    "dpi_value": "物理 {physical} · 有效 {effective}",
+    "target_dpi": "目标 DPI",
+    "dpi_unknown": "未知——此显示器未报告其物理尺寸。",
+    "adaptive_sync": "自适应同步 (FreeSync / G-Sync)",
+    "adaptive_sync_unsupported": "合成器不支持",
+    "position": "位置",
+    "logical_size": "逻辑 {width} × {height}",
+    "apply": "应用",
+    "discard": "放弃",
+    "confirm": "保留这些显示设置吗？{seconds} 秒后将还原。",
+    "keep": "保留",
+    "revert": "还原",
+    "ddc_header": "DDC/CI"
+  },
+  "transform": {
+    "normal": "正常",
+    "90": "90°",
+    "180": "180°",
+    "270": "270°",
+    "flipped": "翻转",
+    "flipped_90": "翻转 90°",
+    "flipped_180": "翻转 180°",
+    "flipped_270": "翻转 270°"
   },
   "category": {
     "image": "图像",
@@ -335,8 +372,8 @@
     "df": "MCCS 版本"
   },
   "errors": {
-    "move_failed": "移动 {name} 失败",
-    "setvcp_failed": "无法在显示器 {id} 上设置 {code}"
+    "setvcp_failed": "无法在显示器 {id} 上设置 {code}",
+    "apply_failed": "无法应用显示设置：{error}"
   },
   "readonly": {
     "no_data": "无数据"

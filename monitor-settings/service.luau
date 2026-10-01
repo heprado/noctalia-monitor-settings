@@ -14,205 +14,187 @@ local STATUS = "monitor_controls.status"
 local COMMAND = "monitor_controls.command"
 local LAYOUT = "monitor_controls.layout"
 
-local GRID_ROWS = 3
-local GRID_COLS = 3
+-- How long a risky change (mode, scale, rotation, on/off) stays applied
+-- without being confirmed in the panel before it's rolled back -- the
+-- same safety net every desktop's display settings has, since a mode the
+-- monitor can't show leaves the user with no screen to click "undo" on.
+local CONFIRM_SECONDS = 15
 
-local function layoutFilePath()
-  return noctalia.pluginDataDir() .. "/layout.json"
+local function configFilePath()
+  return noctalia.pluginDataDir() .. "/displays.json"
 end
 
 local wlrRandrSupported = noctalia.commandExists("wlr-randr")
 local layoutOutputs = {} -- array, same shape wlr.parseOutputs returns
-local layoutCellMap = {} -- { [outputName] = { row, col } }
+
+-- Set while a risky change is waiting for the user's confirmation:
+-- { token, previous (configs to roll back to), next (configs to persist
+-- on confirm), deadlineMs }.
+local pendingConfirm = nil
+local confirmSeq = 0
 
 local function publishLayout()
   noctalia.state.set(LAYOUT, {
     supported = wlrRandrSupported,
     outputs = layoutOutputs,
-    cellMap = layoutCellMap,
+    confirm = pendingConfirm and { deadlineMs = pendingConfirm.deadlineMs, token = pendingConfirm.token } or nil,
   })
 end
 
--- Forward-declared: applyCellMap (below) re-reads via refreshLayout once
--- a `wlr-randr --pos` move completes, but refreshLayout itself is defined
--- further down (it needs applyCellMap to exist first).
-local refreshLayout
-
--- The exact JSON last handed to noctalia.writeFile, so an applyCellMap
--- that changes nothing (every startup reapply, every refresh) doesn't
--- rewrite an identical layout.json over and over.
+-- Saved configs, keyed by output (connector) name -- the plugin's own data
+-- directory, never the compositor's config, which on a Nix/home-manager
+-- setup is read-only.
+local savedConfigs = nil
 local lastPersistedJson = nil
 
--- Runs one `wlr-randr --output <name> --pos <x>,<y>` per output whose
--- computed position differs from what refreshLayout last read, then
--- persists the cell assignment (not the pixels -- see layoutFilePath)
--- and re-reads the live layout so the grid reflects the real outcome
--- rather than the optimistic guess.
---
--- That post-move re-read is deliberately the *non-applying* variant
--- (refreshLayout(false)). Re-applying from inside a callback this very
--- function started is an unbounded loop whenever the move doesn't take:
--- a failed `--pos` (or a compositor that reports back a position other
--- than the one requested) leaves the same difference in place, so the
--- next apply fires the same command again, forever -- spawning a
--- wlr-randr process and a notifyError on every lap. Re-reading and
--- republishing the real state is all this path ever needs to do.
-local function applyCellMap(cellMap)
-  layoutCellMap = cellMap
-  publishLayout()
-
-  if not wlrRandrSupported then
-    return
+local function loadSaved()
+  if savedConfigs ~= nil then
+    return savedConfigs
   end
-
-  local positions = wlr.computeLayout(layoutOutputs, cellMap, GRID_ROWS, GRID_COLS)
-  local byName = {}
-  for _, o in ipairs(layoutOutputs) do
-    byName[o.name] = o
+  savedConfigs = {}
+  local raw = noctalia.readFile(configFilePath())
+  local decoded = raw and noctalia.json.decode(raw)
+  if type(decoded) == "table" then
+    savedConfigs = decoded
   end
+  return savedConfigs
+end
 
-  for name, pos in pairs(positions) do
-    local current = byName[name]
-    if current and (current.x ~= pos.x or current.y ~= pos.y) then
-      noctalia.runAsync(
-        { "wlr-randr", "--output", name, "--pos", pos.x .. "," .. pos.y },
-        function(result)
-          if result.exitCode ~= 0 then
-            noctalia.notifyError(noctalia.tr("panel.title"), noctalia.tr("errors.move_failed", { name = name }))
-          end
-          refreshLayout(false)
-        end
-      )
-    end
+-- Merged into what's already saved rather than replacing it, so a monitor
+-- that's unplugged right now keeps its saved config for next time.
+local function persist(configs)
+  local saved = loadSaved()
+  for name, cfg in pairs(configs) do
+    saved[name] = cfg
   end
-
-  local encoded = noctalia.json.encode(cellMap)
+  local encoded = noctalia.json.encode(saved)
   if encoded ~= lastPersistedJson then
     lastPersistedJson = encoded
-    noctalia.writeFile(layoutFilePath(), encoded)
+    noctalia.writeFile(configFilePath(), encoded)
   end
 end
 
-local layoutLoadedFromDisk = false
-
--- Returns the first cell of the grid that nothing in `taken` occupies,
--- scanning row-major, or nil when every cell is already spoken for (only
--- reachable with more outputs than GRID_ROWS * GRID_COLS cells -- such an
--- output simply stays unassigned rather than being stacked on top of
--- another one).
-local function firstFreeCell(taken)
-  for r = 0, GRID_ROWS - 1 do
-    for c = 0, GRID_COLS - 1 do
-      if not taken[r .. "," .. c] then
-        return { row = r, col = c }
-      end
-    end
-  end
-  return nil
-end
-
--- Re-reads the live output list. Called on service startup, from the
--- panel's Refresh button (so a monitor plugged in since the last read
--- actually shows up), and -- as refreshLayout(false) -- from
--- applyCellMap's own post-move callback.
---
--- `shouldApply` chooses what happens once the fresh output list is in:
--- true re-applies the current cell map through applyCellMap (which is
--- what makes a saved arrangement survive a restart, and what positions a
--- newly seeded output); false only republishes the state that was just
--- read. The post-move path must pass false -- see applyCellMap's comment
--- on why re-applying from inside its own callback never terminates.
---
--- Everything else here happens on every variant alike, exactly once:
--- the first read (whichever call gets there first) is the one that loads
--- layout.json off disk, and any output with no cell yet is seeded on
--- whichever read first sees it.
-refreshLayout = function(shouldApply)
+-- Re-reads the live output list and republishes it. `onDone` (optional)
+-- runs once the fresh list is in.
+local function refreshLayout(onDone)
+  publishLayout()
   if not wlrRandrSupported then
-    publishLayout()
     return
   end
-  -- Publish the support flag before the read, not after it: the panel's
-  -- own default for this state is `supported = false`, so a panel opened
-  -- in the window before the first `wlr-randr --json` resolves would
-  -- otherwise tell a perfectly capable machine that it needs wlr-randr.
-  publishLayout()
   noctalia.runAsync({ "wlr-randr", "--json" }, function(result)
-    if result.exitCode ~= 0 then
-      return
-    end
-    local decoded = noctalia.json.decode(result.stdout)
-    if type(decoded) ~= "table" then
-      return
-    end
-    layoutOutputs = wlr.parseOutputs(decoded)
-
-    if not layoutLoadedFromDisk then
-      layoutLoadedFromDisk = true
-      local raw = noctalia.readFile(layoutFilePath())
-      local saved = raw and noctalia.json.decode(raw)
-      if type(saved) == "table" then
-        -- Merged into the existing map, not swapped in for it: now that
-        -- LAYOUT is published before this read resolves, the panel can
-        -- show a live grid -- and the user can drag a tile, landing a
-        -- set_cell in layoutCellMap -- while this first read is still in
-        -- flight. A wholesale replacement would silently throw that
-        -- drag away.
-        for name, cell in pairs(saved) do
-          layoutCellMap[name] = cell
-        end
+    if result.exitCode == 0 then
+      local decoded = noctalia.json.decode(result.stdout)
+      if type(decoded) == "table" then
+        layoutOutputs = wlr.parseOutputs(decoded)
       end
     end
+    publishLayout()
+    if onDone then
+      onDone()
+    end
+  end)
+end
 
-    -- Seed any output with no cell yet (a monitor plugged in for the
-    -- first time, or the very first run with no saved file at all).
-    -- wlr.seedCellMap is a pure heuristic over the unassigned outputs
-    -- alone -- it has no idea which cells the saved entries already
-    -- occupy -- so its suggestions are filtered here against the cells
-    -- actually in use, both saved ones and the ones handed out earlier
-    -- in this same pass. Without that, a seeded output could land on top
-    -- of a saved one: two outputs at the identical computed position,
-    -- and only one of them still visible in the grid (the panel keys
-    -- cells by "row,col"), with no way to drag the other back out.
-    local unassigned = {}
+-- Runs one atomic `wlr-randr` invocation for every output whose config
+-- differs from its live state (see wlr.buildApplyArgs), then re-reads the
+-- live layout so the panel reflects the real outcome, not the request.
+-- onApplied(ok, risky) runs after that re-read.
+local function applyConfigs(configs, onApplied)
+  local args, risky = wlr.buildApplyArgs(layoutOutputs, configs)
+  if not args then
+    if onApplied then
+      onApplied(true, false)
+    end
+    return
+  end
+  noctalia.runAsync(args, function(result)
+    local ok = result.exitCode == 0
+    if not ok then
+      noctalia.notifyError(
+        noctalia.tr("panel.title"),
+        noctalia.tr("errors.apply_failed", { error = (result.stderr or ""):gsub("%s+$", "") })
+      )
+    end
+    refreshLayout(function()
+      if onApplied then
+        onApplied(ok, risky)
+      end
+    end)
+  end)
+end
+
+local function revertPending()
+  local p = pendingConfirm
+  if not p then
+    return
+  end
+  pendingConfirm = nil
+  publishLayout()
+  applyConfigs(p.previous, nil)
+end
+
+-- Applies the panel's draft. A change limited to position/adaptive sync
+-- is kept and persisted straight away; anything riskier is kept only once
+-- the user confirms it within CONFIRM_SECONDS, else rolled back.
+local function handleApply(configs)
+  if type(configs) ~= "table" then
+    return
+  end
+  -- A new apply while an earlier one awaits confirmation builds on it:
+  -- the rollback target stays the last *confirmed* state.
+  local previous = pendingConfirm and pendingConfirm.previous or wlr.configsFromOutputs(layoutOutputs)
+  applyConfigs(configs, function(ok, risky)
+    if not ok then
+      return
+    end
+    if not risky and not pendingConfirm then
+      persist(configs)
+      return
+    end
+    confirmSeq = confirmSeq + 1
+    local token = confirmSeq
+    pendingConfirm = {
+      token = token,
+      previous = previous,
+      next = configs,
+      deadlineMs = noctalia.nowMs() + CONFIRM_SECONDS * 1000,
+    }
+    publishLayout()
+    -- No timer API in the service runtime; a `sleep` child is one.
+    noctalia.runAsync({ "sleep", tostring(CONFIRM_SECONDS) }, function()
+      if pendingConfirm and pendingConfirm.token == token then
+        noctalia.notify(noctalia.tr("panel.title"), noctalia.tr("panel.reverted"))
+        revertPending()
+      end
+    end)
+  end)
+end
+
+local function handleConfirm()
+  local p = pendingConfirm
+  if not p then
+    return
+  end
+  pendingConfirm = nil
+  persist(p.next)
+  publishLayout()
+end
+
+-- Startup: reapply whatever was saved for the outputs connected now. No
+-- confirmation here -- this is a state the user already confirmed once.
+local function reapplySaved()
+  refreshLayout(function()
+    local saved = loadSaved()
+    local configs = {}
+    local any = false
     for _, o in ipairs(layoutOutputs) do
-      if layoutCellMap[o.name] == nil then
-        table.insert(unassigned, o)
+      if saved[o.name] ~= nil then
+        configs[o.name] = wlr.sanitizeSaved(o, saved[o.name])
+        any = true
       end
     end
-    if #unassigned > 0 then
-      local taken = {}
-      for _, cell in pairs(layoutCellMap) do
-        if cell and cell.row and cell.col then
-          taken[cell.row .. "," .. cell.col] = true
-        end
-      end
-
-      local seeded = wlr.seedCellMap(unassigned, GRID_ROWS, GRID_COLS)
-      -- Iterated over `unassigned` rather than `seeded` so the order is
-      -- the output order wlr-randr reported, not pairs()' arbitrary one
-      -- -- which output wins a contested cell then doesn't change from
-      -- run to run.
-      for _, o in ipairs(unassigned) do
-        local cell = seeded[o.name]
-        if cell then
-          local key = cell.row .. "," .. cell.col
-          if taken[key] then
-            cell = firstFreeCell(taken)
-            key = cell and (cell.row .. "," .. cell.col) or nil
-          end
-          if cell and key then
-            taken[key] = true
-            layoutCellMap[o.name] = cell
-          end
-        end
-      end
-    end
-
-    if shouldApply then
-      applyCellMap(layoutCellMap)
-    else
-      publishLayout()
+    if any then
+      applyConfigs(configs, nil)
     end
   end)
 end
@@ -476,9 +458,9 @@ noctalia.state.watch(COMMAND, function(cmd)
     -- The two halves of this plugin have entirely separate notions of
     -- "what's connected" -- ddcutil's display list and wlr-randr's output
     -- list -- and one Refresh press is meant to re-read both, so a
-    -- monitor plugged in since startup appears in the arrangement grid
+    -- monitor plugged in since startup appears in the arrangement canvas
     -- without reloading the whole plugin.
-    refreshLayout(true)
+    refreshLayout(nil)
   elseif cmd.action == "ensure_loaded" then
     -- The panel/shortcut send this from onOpen, every time they open --
     -- checked (latched true the moment a real detect starts, not when it
@@ -490,34 +472,14 @@ noctalia.state.watch(COMMAND, function(cmd)
     end
   elseif cmd.action == "setvcp" then
     handleSetvcp(cmd)
-  elseif cmd.action == "set_cell" then
-    local newCellMap = {}
-    for name, cell in pairs(layoutCellMap) do
-      newCellMap[name] = cell
-    end
-
-    -- A cell holds at most one output (the design's rule, and what the
-    -- panel's "row,col"-keyed cell lookup assumes). Dropping a tile onto
-    -- an occupied cell is therefore a *swap*, not an overwrite: the
-    -- output already there takes the dragged one's old cell. Overwriting
-    -- instead would give both the identical computed pixel position, and
-    -- the displaced tile would vanish from the grid with no way to drag
-    -- it back.
-    local previous = newCellMap[cmd.name]
-    for name, cell in pairs(newCellMap) do
-      if name ~= cmd.name and cell and cell.row == cmd.row and cell.col == cmd.col then
-        -- previous is nil only for an output that had no cell at all
-        -- (never seeded); then there's nowhere to swap the occupant to,
-        -- so it's evicted to "unassigned" rather than stacked.
-        newCellMap[name] = previous
-        break
-      end
-    end
-
-    newCellMap[cmd.name] = { row = cmd.row, col = cmd.col }
-    applyCellMap(newCellMap)
+  elseif cmd.action == "apply_config" then
+    handleApply(cmd.configs)
+  elseif cmd.action == "confirm_config" then
+    handleConfirm()
+  elseif cmd.action == "revert_config" then
+    revertPending()
   end
 end)
 
 publish()
-refreshLayout(true)
+reapplySaved()

@@ -14,23 +14,35 @@ Ported from a richer feature I originally built for [tama-shell](https://github.
 - DDC/CI enabled in each monitor's own OSD menu (most monitors ship with this off by default).
 - Your user typically needs `i2c-dev` access (e.g. in the `i2c` group) for `ddcutil` to talk to the monitor without
   root.
-- `wlr-randr` installed and on `PATH`, for the monitor arrangement grid. Any compositor implementing
-  `wlr-output-management-v1` is supported (Hyprland, Sway, river, ...). If it's missing or the
-  compositor doesn't support it, the arrangement screen shows an explanatory message instead of the
-  grid, but the rest of the plugin (DDC/CI controls) still works.
+- `wlr-randr` installed and on `PATH`, for the arrangement canvas and display settings. Any compositor implementing
+  `wlr-output-management-v1` is supported (Hyprland, Sway, river, ...). If it's missing or the compositor doesn't
+  support it, the panel shows an explanatory message instead of the canvas, but the rest of the plugin (DDC/CI
+  controls) still works. Adaptive sync needs version 4 of that protocol; on older compositors the toggle is disabled.
 
 ## What it does
 
 - A bar widget shows how many DDC/CI-capable monitors are detected; click it to open the controls panel.
-- **The panel opens on a monitor arrangement grid**: every output `wlr-randr` reports as a tile on a 3x3 grid of
-  cells. Drag a tile to another cell to move that monitor relative to the others -- the new arrangement is applied
-  live via `wlr-randr --pos`, and dropping onto a cell that's already occupied swaps the two. Select a tile and press
-  **Configurações** to open that monitor's DDC/CI settings (below); a back arrow returns to the grid.
-- The arrangement persists to the plugin's own data directory (`layout.json`, as cell assignments rather than raw
-  pixel positions) -- never to the compositor's own config, which on a Nix/home-manager setup is read-only -- and is
-  reapplied automatically the next time Noctalia starts.
-- The two halves are independent: no `wlr-randr` means no grid but working DDC/CI controls, and no `ddcutil` means a
-  working grid with the settings button disabled.
+- **The panel opens on a monitor arrangement canvas**, in the style of `nwg-displays`: every output `wlr-randr`
+  reports, drawn to scale (rotation and scale included) at its real position. Drag a monitor by its name chip to move
+  it anywhere -- on release it snaps flush against the nearest edges of its neighbours, never overlaps one, and never
+  floats off on its own (a gap between monitors is a dead zone the cursor can't cross). The X/Y fields below the
+  canvas set an exact position.
+- **Per-output display settings** for the selected monitor:
+  - on/off (the last enabled output can't be switched off),
+  - resolution and refresh rate, from the modes the output advertises,
+  - rotation (all eight `wl_output` transforms, plus quick rotate buttons),
+  - scale -- presets or any custom value -- and **DPI**: the monitor's physical and effective DPI (from its EDID
+    size), plus a target-DPI field that derives the scale. Wayland has no per-monitor DPI separate from scale; scale
+    *is* that setting,
+  - **adaptive sync** (VRR -- what FreeSync and G-Sync Compatible are on Wayland), when the compositor can report it.
+- Edits are a draft until **Apply**, which sends every change as **one atomic `wlr-randr` call**. A change limited to
+  position/adaptive sync is kept right away; a riskier one (mode, scale, rotation, on/off) has to be confirmed within
+  15 seconds or it's rolled back automatically -- the usual safety net for a mode the monitor can't show.
+- Confirmed configs persist to the plugin's own data directory (`displays.json`, keyed by connector name) -- never to
+  the compositor's own config, which on a Nix/home-manager setup is read-only -- and are reapplied automatically the
+  next time Noctalia starts.
+- The two halves are independent: no `wlr-randr` means no canvas but working DDC/CI controls (from a plain monitor
+  list), and no `ddcutil` means working display settings without the DDC/CI section.
 - Each monitor's settings screen lists every VCP feature `ddcutil capabilities` +
   `ddcutil vcpinfo --verbose` report, classified into the right control automatically:
   - **Read Write, Continuous** -> slider (brightness, contrast, RGB gain, ...)
@@ -39,7 +51,7 @@ Ported from a richer feature I originally built for [tama-shell](https://github.
   - Everything else -> read-only text
   - Audio speaker volume (`62`) gets a mute toggle composited onto its slider from Audio mute (`8D`)
 - A Refresh button re-runs `ddcutil detect` and re-reads every monitor's capabilities/values, and re-reads
-  `wlr-randr --json` so a monitor plugged in since the last scan shows up on the grid (nothing polls
+  `wlr-randr --json` so a monitor plugged in since the last scan shows up on the canvas (nothing polls
   continuously -- DDC/CI queries are slow I2C round-trips).
 - All writes are fire-and-forget `ddcutil setvcp` calls with an optimistic local update; a failed write surfaces a
   notification.
