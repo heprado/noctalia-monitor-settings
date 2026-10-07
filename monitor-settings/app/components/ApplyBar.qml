@@ -13,6 +13,26 @@ Rectangle {
     readonly property bool confirming: DisplayService.pending !== null
     property real now: Date.now()
 
+    // Apply turns green for a moment once a change is in for good (see
+    // DisplayService.persisted) -- after Apply for a safe change, or after
+    // Keep for a risky one.
+    property bool justApplied: false
+    readonly property color appliedColor: "#2ea043"
+
+    Connections {
+        target: DisplayService
+        function onPersisted() {
+            root.justApplied = true
+            appliedTimer.restart()
+        }
+    }
+
+    Timer {
+        id: appliedTimer
+        interval: 2000
+        onTriggered: root.justApplied = false
+    }
+
     implicitHeight: row.implicitHeight + 16
     radius: 8
     color: confirming ? Qt.rgba(pal.highlight.r, pal.highlight.g, pal.highlight.b, 0.18) : "transparent"
@@ -63,10 +83,18 @@ Rectangle {
         }
         Button {
             visible: !root.confirming
-            enabled: Draft.dirty
+            // Kept enabled while green: the disabled palette would grey the
+            // green out. With nothing left to apply, a click does nothing.
+            enabled: Draft.dirty || root.justApplied
             highlighted: true
             text: I18n.t("display.apply")
-            onClicked: Draft.apply()
+            // Fusion fills a button from palette.button (highlighted only
+            // tints the outline), so both are swapped; going through the
+            // palette keeps Fusion's gradient, hover and outline.
+            palette.button: root.justApplied ? root.appliedColor : pal.button
+            palette.highlight: root.justApplied ? root.appliedColor : pal.highlight
+            palette.buttonText: root.justApplied ? "white" : pal.buttonText
+            onClicked: if (Draft.dirty) Draft.apply()
         }
     }
 }

@@ -31,6 +31,9 @@ Singleton {
     property var saved: ({})
 
     signal applied(bool ok)
+    // A change is in for good: applied and kept without confirmation, or
+    // confirmed with Keep. Not emitted for one still awaiting confirmation.
+    signal persisted()
 
     FileView {
         id: savedFile
@@ -54,6 +57,7 @@ Singleton {
         for (const name in configs) merged[name] = configs[name]
         saved = merged
         savedFile.setText(JSON.stringify(merged, null, 2) + "\n")
+        root.persisted()
     }
 
     function refresh(onDone) {
