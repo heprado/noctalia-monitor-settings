@@ -23,6 +23,17 @@ in
       description = "The Monitor Settings package to use.";
     };
 
+    plugin = lib.mkEnableOption ""
+      // {
+        description = ''
+          Also install the Noctalia plugin (bar widget with the refresh rate,
+          launcher result, reapply at shell start) into Noctalia's plugin data
+          directory. Enable it once with
+          `noctalia msg plugins enable heprado/monitor-settings`. Its service
+          reapplies the saved layout too, so reapplyAtLogin can be turned off.
+        '';
+      };
+
     reapplyAtLogin = lib.mkOption {
       type = lib.types.bool;
       default = true;
@@ -37,7 +48,17 @@ in
   };
 
   config = lib.mkIf cfg.enable {
-    home.packages = [ cfg.package ];
+    home.packages = [ cfg.package ]
+      # The plugin finds these on PATH, where the package's wrapper doesn't reach.
+      ++ lib.optionals cfg.plugin [
+        pkgs.quickshell
+        pkgs.wlr-randr
+        pkgs.ddcutil
+      ];
+
+    xdg.dataFile."noctalia/plugins/monitor-settings" = lib.mkIf cfg.plugin {
+      source = "${self}/monitor-settings";
+    };
 
     systemd.user.services.monitor-settings-reapply = lib.mkIf cfg.reapplyAtLogin {
       Unit = {

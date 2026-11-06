@@ -1,7 +1,7 @@
 id           = "heprado/monitor-settings"
 name         = "Monitor Settings (DDC/CI)"
-version      = "2.0.0"
-plugin_api   = 24
+version      = "2.1.0"
+plugin_api   = 43
 author       = "heprado"
 license      = "MIT"
 icon         = "device-desktop"

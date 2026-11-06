@@ -132,9 +132,14 @@ With home-manager, the module also takes over the Noctalia service's job: a ones
   # in your home-manager configuration:
   imports = [ inputs.monitor-settings.homeManagerModules.default ];
   programs.monitor-settings.enable = true;
+  # programs.monitor-settings.plugin = true;           # also install the Noctalia plugin
   # programs.monitor-settings.reapplyAtLogin = false;  # to skip the login service
 }
 ```
+
+With `plugin = true` the Noctalia plugin is linked from the store as well; enable it once with
+`noctalia msg plugins enable heprado/monitor-settings`. Its bar widget shows the refresh rate of the output it
+sits on, read from `wlr-randr --json` every 10 seconds, next to the icon that opens the app.
 
 The login service needs a compositor started through systemd (UWSM, or its own systemd integration), so that
 `graphical-session.target` and `WAYLAND_DISPLAY` reach user services. Both installs share the same saved layout
