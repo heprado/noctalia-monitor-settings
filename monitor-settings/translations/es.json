@@ -27,8 +27,6 @@
     "dpi_value": "{physical} físico · {effective} efectivo",
     "target_dpi": "PPP deseado",
     "dpi_unknown": "Desconocido -- este monitor no informa su tamaño físico.",
-    "adaptive_sync": "Sincronización adaptativa (FreeSync / G-Sync)",
-    "adaptive_sync_unsupported": "No compatible con el compositor",
     "position": "Posición",
     "logical_size": "{width} × {height} lógico",
     "apply": "Aplicar",

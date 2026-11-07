@@ -182,27 +182,6 @@ ColumnLayout {
             }
         }
 
-        // Adaptive sync (VRR): what FreeSync and G-Sync Compatible are on
-        // Wayland. null = the compositor can't report or set it.
-        Label { text: I18n.t("display.adaptive_sync") }
-        RowLayout {
-            Layout.fillWidth: true
-            readonly property bool supported: root.output !== null && root.output.adaptiveSync !== null
-
-            Switch {
-                enabled: parent.supported
-                checked: root.cfg.adaptiveSync === true
-                onToggled: Draft.patch(root.name, { adaptiveSync: checked })
-            }
-            Label {
-                Layout.fillWidth: true
-                visible: !parent.supported
-                wrapMode: Text.WordWrap
-                text: I18n.t("display.adaptive_sync_unsupported")
-                color: pal.placeholderText
-            }
-        }
-
         // Exact position -------------------------------------------------
         Label { text: I18n.t("display.position") }
         RowLayout {

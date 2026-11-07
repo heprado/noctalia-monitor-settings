@@ -95,7 +95,7 @@ Singleton {
         })
     }
 
-    // Applies the UI's draft. Position/adaptive-sync-only changes are kept
+    // Applies the UI's draft. Position-only changes are kept
     // and persisted straight away; anything riskier only once confirmed.
     function apply(configs) {
         // A new apply while an earlier one awaits confirmation builds on

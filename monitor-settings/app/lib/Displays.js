@@ -12,7 +12,7 @@
 //     every mode it supports, physical size, and its live settings;
 //   * a *config* is the editable subset of an output's settings
 //     (configFromOutput): { enabled, width, height, refresh, x, y,
-//     transform, scale, adaptiveSync }. The UI edits configs as a draft,
+//     transform, scale }. The UI edits configs as a draft,
 //     DisplayService diffs them against the live outputs into one atomic
 //     `wlr-randr` invocation (buildApplyArgs) and persists them.
 
@@ -30,8 +30,7 @@ function isTransform(t) {
 // (wlr-randr's print_state_json): { name, description, make, model,
 // serial, physical_size: {width, height} (mm), enabled, modes: [{width,
 // height, refresh, preferred, current}] } -- plus, only when enabled,
-// position: {x, y}, transform, scale and adaptive_sync (true/false, or
-// null when the compositor's protocol version can't report it).
+// position: {x, y}, transform and scale.
 // Disabled outputs are kept: the UI needs them listed to turn them on.
 function parseOutputs(rawList) {
     var outputs = []
@@ -75,7 +74,6 @@ function parseOutputs(rawList) {
             y: (raw.position && raw.position.y) || 0,
             transform: isTransform(raw.transform) ? raw.transform : "normal",
             scale: Number(raw.scale) || 1,
-            adaptiveSync: (raw.adaptive_sync === true || raw.adaptive_sync === false) ? raw.adaptive_sync : null,
             physWidth: Number(phys.width) || 0,
             physHeight: Number(phys.height) || 0
         })
@@ -114,8 +112,7 @@ function configFromOutput(o) {
         x: o.x || 0,
         y: o.y || 0,
         transform: o.transform || "normal",
-        scale: o.scale || 1,
-        adaptiveSync: o.adaptiveSync
+        scale: o.scale || 1
     }
 }
 
@@ -462,7 +459,7 @@ function sameNumber(a, b, eps) {
 // neighbour aside (eDP-1 moved below HDMI-A-1 sends HDMI-A-1 from 0,0 to
 // the right of it) -- which is exactly the state right after login.
 //
-// `risky` reports whether anything beyond position/adaptive sync changed
+// `risky` reports whether anything beyond position changed
 // (mode, scale, rotation, on/off): the changes that can leave a screen
 // unreadable, which DisplayService asks the user to confirm.
 function buildApplyArgs(outputs, configs, program) {
@@ -513,10 +510,6 @@ function buildApplyArgs(outputs, configs, program) {
             }
             if (cfg.x !== o.x || cfg.y !== o.y || !o.enabled)
                 out.push("--pos", Math.floor(cfg.x) + "," + Math.floor(cfg.y))
-            // null means the compositor can't report (or set) it; passing
-            // the flag then makes wlr-randr fail the whole command.
-            if (cfg.adaptiveSync != null && o.adaptiveSync != null && cfg.adaptiveSync !== o.adaptiveSync)
-                out.push("--adaptive-sync", cfg.adaptiveSync ? "enabled" : "disabled")
         }
         if (out.length > 0) any = true
         perOutput.push({ output: o, cfg: cfg, out: out })
@@ -539,8 +532,7 @@ function buildApplyArgs(outputs, configs, program) {
 }
 
 // A saved config, minus anything the live output can no longer honour (a
-// mode it stopped advertising, an adaptive-sync state the compositor
-// can't set) -- those fields fall back to the live value.
+// mode it stopped advertising) -- those fields fall back to the live value.
 function sanitizeSaved(o, saved) {
     var cfg = configFromOutput(o)
     if (!saved || typeof saved !== "object") return cfg
@@ -556,6 +548,5 @@ function sanitizeSaved(o, saved) {
         cfg.x = Math.floor(saved.x)
         cfg.y = Math.floor(saved.y)
     }
-    if (o.adaptiveSync != null && typeof saved.adaptiveSync === "boolean") cfg.adaptiveSync = saved.adaptiveSync
     return cfg
 }

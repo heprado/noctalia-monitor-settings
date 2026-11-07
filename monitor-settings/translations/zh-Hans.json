@@ -27,8 +27,6 @@
     "dpi_value": "物理 {physical} · 有效 {effective}",
     "target_dpi": "目标 DPI",
     "dpi_unknown": "未知——此显示器未报告其物理尺寸。",
-    "adaptive_sync": "自适应同步 (FreeSync / G-Sync)",
-    "adaptive_sync_unsupported": "合成器不支持",
     "position": "位置",
     "logical_size": "逻辑 {width} × {height}",
     "apply": "应用",

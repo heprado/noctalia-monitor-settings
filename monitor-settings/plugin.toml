@@ -5,7 +5,7 @@ plugin_api   = 43
 author       = "heprado"
 license      = "MIT"
 icon         = "device-desktop"
-description  = "A Quickshell app for display arrangement (drag-and-drop canvas, resolution, refresh rate, rotation, scale/DPI, adaptive sync) and full DDC/CI monitor controls, themed by the active Qt theme."
+description  = "A Quickshell app for display arrangement (drag-and-drop canvas, resolution, refresh rate, rotation, scale/DPI) and full DDC/CI monitor controls, themed by the active Qt theme."
 dependencies = ["quickshell", "ddcutil", "wlr-randr"]
 tags         = ["hardware", "monitor", "display", "ddcutil", "wlr-randr", "quickshell"]
 

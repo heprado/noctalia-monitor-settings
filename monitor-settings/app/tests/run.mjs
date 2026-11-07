@@ -72,10 +72,8 @@ test("parseOutputs keeps disabled outputs and reads every field", () => {
   assert.equal(outputs.length, 3)
   assert.equal(edp.width, 1920)
   assert.equal(edp.refresh, 120.114)
-  assert.equal(edp.adaptiveSync, false)
   assert.equal(edp.modes.length, 3)
   assert.equal(dp.transform, "90")
-  assert.equal(dp.adaptiveSync, null)
   assert.equal(hdmi.enabled, false)
   assert.equal(hdmi.width, null)
 })
@@ -138,16 +136,14 @@ test("buildApplyArgs: position-only change isn't risky", () => {
   assert.equal(r.risky, false)
 })
 
-test("buildApplyArgs: mode + adaptive sync + turning an output on, atomically", () => {
+test("buildApplyArgs: mode + turning an output on, atomically", () => {
   const configs = D.configsFromOutputs(outputs)
   configs["eDP-1"].refresh = 60
-  configs["eDP-1"].adaptiveSync = true
-  configs["DP-1"].adaptiveSync = true // unknown live state: never passed
   configs["HDMI-A-1"].enabled = true
   configs["HDMI-A-1"].x = 3000
   const r = D.buildApplyArgs(outputs, configs)
   assert.equal(r.args.join(" "),
-    "wlr-randr --output eDP-1 --mode 1920x1080@60Hz --adaptive-sync enabled --pos 1080,840"
+    "wlr-randr --output eDP-1 --mode 1920x1080@60Hz --pos 1080,840"
     + " --output DP-1 --pos 0,0"
     + " --output HDMI-A-1 --on --mode 3840x2160@60Hz --transform normal --scale 1 --pos 3000,0")
   assert.equal(r.risky, true)

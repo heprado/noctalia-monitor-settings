@@ -5,8 +5,7 @@ A [Noctalia](https://github.com/noctalia-dev/noctalia) plugin that opens **Monit
 
 - **Display arrangement** in the style of `nwg-displays`: a canvas with every output drawn to scale, dragged freely
   with the mouse, snapping flush against its neighbours.
-- **Per-output display settings** through `wlr-randr`: on/off, resolution, refresh rate, rotation, scale, DPI and
-  adaptive sync (FreeSync / G-Sync).
+- **Per-output display settings** through `wlr-randr`: on/off, resolution, refresh rate, rotation, scale and DPI.
 - **Full DDC/CI control** through [`ddcutil`](https://www.ddcutil.com/): not just brightness (which Noctalia already
   supports natively) but every VCP feature the monitor reports, including contrast, RGB gain, input source and audio
   volume/mute, grouped by category.
@@ -41,7 +40,6 @@ The Noctalia plugin only launches the app:
 
 - `quickshell` on `PATH` (0.3 or newer).
 - `wlr-randr` on `PATH`, and a compositor implementing `wlr-output-management-v1` (Hyprland, Sway, river, ...).
-  Adaptive sync needs version 4 of that protocol; on older compositors the switch is disabled.
 - `ddcutil` on `PATH` for the DDC/CI tab. DDC/CI also has to be enabled in each monitor's own OSD menu, and your user
   needs `i2c-dev` access (e.g. the `i2c` group).
 
@@ -59,7 +57,7 @@ settings.
   physical and effective DPI (from its EDID size), and a target-DPI field derives the scale from it. Wayland has no
   per-monitor DPI separate from scale: scale *is* that setting. X/Y set an exact position.
 - **Apply:** edits are a draft until **Apply**, which sends every change as **one atomic `wlr-randr` call**.
-  - Changes limited to position or adaptive sync are kept right away.
+  - Changes limited to position are kept right away.
   - Riskier changes (mode, scale, rotation, on/off) must be confirmed within 15 seconds, or they're rolled back
     automatically.
 - **Persistence:** confirmed configs are saved to `~/.local/share/quickshell/by-shell/heprado-monitor-settings/

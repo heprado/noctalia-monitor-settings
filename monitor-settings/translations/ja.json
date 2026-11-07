@@ -27,8 +27,6 @@
     "dpi_value": "物理 {physical} · 実効 {effective}",
     "target_dpi": "目標 DPI",
     "dpi_unknown": "不明 -- このモニターは物理サイズを報告していません。",
-    "adaptive_sync": "アダプティブシンク (FreeSync / G-Sync)",
-    "adaptive_sync_unsupported": "コンポジターが対応していません",
     "position": "位置",
     "logical_size": "論理 {width} × {height}",
     "apply": "適用",
