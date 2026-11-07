@@ -3,7 +3,8 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import qs.services
 
-// Apply / Discard for the draft -- or, while a risky change awaits
+// Apply / Discard for both drafts, the display settings' (Draft) and the
+// DDC/CI one (DdcService.draft) -- or, while a risky display change awaits
 // confirmation, Keep / Revert with the auto-revert countdown.
 Rectangle {
     id: root
@@ -11,20 +12,28 @@ Rectangle {
     SystemPalette { id: pal; colorGroup: SystemPalette.Active }
 
     readonly property bool confirming: DisplayService.pending !== null
+    readonly property bool dirty: Draft.dirty || DdcService.dirty
     property real now: Date.now()
 
-    // Apply turns green for a moment once a change is in for good (see
-    // DisplayService.persisted) -- after Apply for a safe change, or after
-    // Keep for a risky one.
+    // Apply turns green for a moment once a change is in for good: display
+    // settings once persisted (after Apply for a safe change, or after
+    // Keep for a risky one), DDC/CI once every staged write went through.
     property bool justApplied: false
     readonly property color appliedColor: "#2ea043"
 
+    function flashApplied() {
+        justApplied = true
+        appliedTimer.restart()
+    }
+
     Connections {
         target: DisplayService
-        function onPersisted() {
-            root.justApplied = true
-            appliedTimer.restart()
-        }
+        function onPersisted() { root.flashApplied() }
+    }
+
+    Connections {
+        target: DdcService
+        function onApplied() { root.flashApplied() }
     }
 
     Timer {
@@ -77,15 +86,19 @@ Rectangle {
 
         Button {
             visible: !root.confirming
-            enabled: Draft.dirty
+            enabled: root.dirty && !DdcService.applying
             text: I18n.t("display.discard")
-            onClicked: Draft.discard()
+            onClicked: {
+                if (Draft.dirty) Draft.discard()
+                if (DdcService.dirty) DdcService.discard()
+            }
         }
         Button {
             visible: !root.confirming
             // Kept enabled while green: the disabled palette would grey the
             // green out. With nothing left to apply, a click does nothing.
-            enabled: Draft.dirty || root.justApplied
+            // Off while DDC/CI writes are still going out one by one.
+            enabled: (root.dirty || root.justApplied) && !DdcService.applying
             highlighted: true
             text: I18n.t("display.apply")
             // Fusion fills a button from palette.button (highlighted only
@@ -94,7 +107,10 @@ Rectangle {
             palette.button: root.justApplied ? root.appliedColor : pal.button
             palette.highlight: root.justApplied ? root.appliedColor : pal.highlight
             palette.buttonText: root.justApplied ? "white" : pal.buttonText
-            onClicked: if (Draft.dirty) Draft.apply()
+            onClicked: {
+                if (Draft.dirty) Draft.apply()
+                if (DdcService.dirty) DdcService.apply()
+            }
         }
     }
 }

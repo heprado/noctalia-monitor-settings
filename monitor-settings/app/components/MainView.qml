@@ -111,9 +111,10 @@ Rectangle {
             }
         }
 
+        // Also there without wlr-randr: DDC/CI edits need Apply too.
         ApplyBar {
             Layout.fillWidth: true
-            visible: DisplayService.supported
+            visible: DisplayService.supported || DdcService.available
         }
     }
 }

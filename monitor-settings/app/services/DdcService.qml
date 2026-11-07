@@ -180,19 +180,101 @@ Singleton {
 
     // value is the string ddcutil expects (decimal for continuous, "0xNN"
     // for enum/button). The UI updates optimistically; setvcp's exit code
-    // is the only confirmation ddcutil gives quickly.
+    // is the only confirmation ddcutil gives quickly. Only write-only
+    // triggers still call this directly -- values go through the draft.
     function setvcp(id, code, value, optimisticCurrent, onError) {
         const m = findMonitor(id)
         if (!m) return
-        if (optimisticCurrent !== undefined && optimisticCurrent !== null) {
-            for (const f of (m.raw || [])) {
-                if (f.code === code) f.current = optimisticCurrent
-            }
-            classifyAll(m, m.raw || [], m.deviceNames)
-            publish()
-        }
+        if (optimisticCurrent !== undefined && optimisticCurrent !== null) setCurrent(m, code, optimisticCurrent)
         Exec.run(["ddcutil", "--display", id, "setvcp", code, value], result => {
             if (result.exitCode !== 0 && onError) onError(result.stderr)
         })
+    }
+
+    function setCurrent(m, code, current) {
+        for (const f of (m.raw || [])) {
+            if (f.code === code) f.current = current
+        }
+        classifyAll(m, m.raw || [], m.deviceNames)
+        publish()
+    }
+
+    // Draft ---------------------------------------------------------------
+    // Like the display settings, value edits wait for Apply instead of
+    // writing the moment a control moves: { monitorId: { code: { value,
+    // current } } }, value being what setvcp takes and current what the
+    // UI shows meanwhile (null for a value with no number to show).
+    // Replaced, never mutated, so bindings reading it re-evaluate.
+    property var draft: ({})
+    readonly property bool dirty: Object.keys(draft).length > 0
+    property bool applying: false
+    // { monitorId: { code: true } } for writes the last Apply couldn't make.
+    property var failed: ({})
+
+    // Every pending write went through.
+    signal applied()
+
+    function stage(id, code, value, current) {
+        const next = Object.assign({}, draft)
+        next[id] = Object.assign({}, next[id] || {})
+        next[id][code] = { value: value, current: current }
+        draft = next
+    }
+
+    function discard() {
+        draft = ({})
+        failed = ({})
+    }
+
+    // Writes the draft one setvcp at a time: they all share the I2C bus,
+    // and ddcutil calls started together would race each other there.
+    // Each success updates the shown value and leaves the draft; a
+    // failure stays in it, so Apply can be retried or the edit discarded.
+    function apply() {
+        if (applying) return
+        const writes = []
+        for (const id in draft) {
+            for (const code in draft[id]) writes.push({ id: id, code: code, value: draft[id][code].value, current: draft[id][code].current })
+        }
+        if (writes.length === 0) return
+        applying = true
+        failed = ({})
+        let anyFailed = false
+
+        const step = i => {
+            if (i >= writes.length) {
+                root.applying = false
+                if (!anyFailed) root.applied()
+                return
+            }
+            const w = writes[i]
+            Exec.run(["ddcutil", "--display", w.id, "setvcp", w.code, w.value], result => {
+                if (result.exitCode === 0) {
+                    const m = root.findMonitor(w.id)
+                    if (m && w.current !== null) root.setCurrent(m, w.code, w.current)
+                    root.unstage(w.id, w.code, w.value)
+                } else {
+                    anyFailed = true
+                    const f = Object.assign({}, root.failed)
+                    f[w.id] = Object.assign({}, f[w.id] || {})
+                    f[w.id][w.code] = true
+                    root.failed = f
+                }
+                step(i + 1)
+            })
+        }
+        step(0)
+    }
+
+    // Drops an applied entry -- unless it was edited again while the
+    // write was in flight, in which case the newer value still waits.
+    function unstage(id, code, writtenValue) {
+        const entry = (draft[id] || {})[code]
+        if (!entry || entry.value !== writtenValue) return
+        const next = Object.assign({}, draft)
+        next[id] = Object.assign({}, next[id])
+        delete next[id][code]
+        if (Object.keys(next[id]).length === 0) delete next[id]
+        draft = next
     }
 }

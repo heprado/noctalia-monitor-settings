@@ -74,8 +74,13 @@ settings.
   - everything else → read-only text
   - Audio speaker volume (`62`) gets a mute toggle from Audio mute (`8D`).
 
-  Writes are `ddcutil setvcp` calls with an optimistic update; nothing polls, because DDC/CI queries are slow I2C
-  round-trips. **Refresh** re-reads both outputs and monitors.
+  Value changes are a draft too: nothing reaches the monitor until **Apply**, which writes only the final value of
+  each changed feature, as `ddcutil setvcp` calls run one at a time (they share the I2C bus). A write that fails
+  stays in the draft and is flagged on its card, so it can be retried or discarded. Write-only triggers have no
+  value to hold back and still run on click. Nothing polls, because DDC/CI queries are slow I2C round-trips.
+  **Refresh** re-reads both outputs and monitors.
+- **Feedback:** Apply turns green for 2 seconds once a change is in for good: a display change once kept, the
+  DDC/CI draft once every write went through.
 - Manufacturer-specific picture-mode names (e.g. ASUS's GameVisual presets) aren't known to `ddcutil` at all. See
   [`monitor-settings/devices/`](monitor-settings/devices/README.md) for the community-contributed per-manufacturer
   override files.
